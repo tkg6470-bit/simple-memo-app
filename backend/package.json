@@ -1,0 +1,25 @@
+{
+  "name": "memo-backend",
+  "version": "1.0.0",
+  "description": "Node.js Express backend for Memo App",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --watch '**/*.ts' --exec \"ts-node\" index.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "@types/pg": "^8.11.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "nodemon": "^3.1.0"
+  }
+}
