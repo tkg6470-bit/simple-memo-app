@@ -1,138 +1,98 @@
-// backend/index.ts
 import express, { Request, Response } from "express";
-import { Pool } from "pg";
-import cors from "cors"; // フロントエンドからの通信を許可するライブラリ
+import { PrismaClient } from "@prisma/client";
+import cors from "cors";
 
 const app = express();
+const prisma = new PrismaClient();
 const PORT = process.env.PORT || 8080;
 
-// ミドルウェアの設定
-app.use(cors()); // CORSを有効化 (これが重要！)
-app.use(express.json()); // JSONボディをパースする
+// ミドルウェア
+app.use(cors()); // フロントエンドからのアクセスを許可
+app.use(express.json()); // JSONを受け取れるようにする
 
-// ★ データベース接続設定
-const pool = new Pool({
-  user: process.env.DB_USER || "user",
-  host: process.env.DB_HOST || "db",
-  database: process.env.DB_NAME || "memo_app_db",
-  password: process.env.DB_PASSWORD || "password",
-  port: parseInt(process.env.DB_PORT || "5432"),
-});
-
-// テーブル作成関数
-const createMemosTable = async () => {
-  try {
-    const client = await pool.connect();
-    const query = `
-      CREATE TABLE IF NOT EXISTS memos (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    await client.query(query);
-    client.release();
-    console.log("PostgreSQL: Memos table checked/created successfully.");
-  } catch (err) {
-    console.error("Error creating memos table or connecting to DB:", err);
-    process.exit(1);
-  }
-};
-
-// =========================================================
-// APIルート
-// =========================================================
-
+// 動作確認用
 app.get("/", (req: Request, res: Response) => {
-  res.send("Memo Backend API is running!");
+  res.send("Memo App Backend with Prisma is running!");
 });
 
-// 1. CREATE: メモの作成
-app.post("/api/memos", async (req: Request, res: Response) => {
-  const { title, content } = req.body;
-  if (!title || !content)
-    return res.status(400).json({ error: "Required fields missing" });
+// =========================================================
+// APIルート (Prisma版)
+// =========================================================
+
+// 1. READ (List): メモ一覧取得
+app.get("/memos", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      "INSERT INTO memos (title, content) VALUES ($1, $2) RETURNING *",
-      [title, content]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
+    const memos = await prisma.memo.findMany({
+      orderBy: {
+        created_at: "desc", // 作成日時の新しい順
+      },
+    });
+    res.json(memos);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch memos" });
   }
 });
 
-// 2. READ (List): メモ一覧取得
-app.get("/api/memos", async (req: Request, res: Response) => {
+// 2. CREATE: メモ作成
+app.post("/memos", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM memos ORDER BY created_at DESC"
-    );
-    res.status(200).json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-});
-
-// 3. READ (Detail): メモ詳細取得
-app.get("/api/memos/:id", async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id);
-    const result = await pool.query("SELECT * FROM memos WHERE id = $1", [id]);
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Memo not found" });
-    res.status(200).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
-  }
-});
-
-// 4. UPDATE: メモ更新
-app.put("/api/memos/:id", async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id);
     const { title, content } = req.body;
-    const result = await pool.query(
-      "UPDATE memos SET title = COALESCE($1, title), content = COALESCE($2, content), updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *",
-      [title, content, id]
-    );
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Memo not found" });
-    res.status(200).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
+
+    // バリデーション（簡易）
+    if (!title || !content) {
+      return res.status(400).json({ error: "Title and content are required" });
+    }
+
+    const newMemo = await prisma.memo.create({
+      data: {
+        title,
+        content,
+      },
+    });
+    res.json(newMemo);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create memo" });
   }
 });
 
-// 5. DELETE: メモ削除
-app.delete("/api/memos/:id", async (req: Request, res: Response) => {
+// 3. UPDATE: メモ更新
+app.put("/memos/:id", async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id);
-    const result = await pool.query(
-      "DELETE FROM memos WHERE id = $1 RETURNING id",
-      [id]
-    );
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "Memo not found" });
-    res.status(204).send();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Database error" });
+    const { id } = req.params;
+    const { title, content } = req.body;
+
+    const updatedMemo = await prisma.memo.update({
+      where: { id: Number(id) },
+      data: {
+        title,
+        content,
+      },
+    });
+    res.json(updatedMemo);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update memo" });
   }
 });
 
-const startServer = async () => {
-  await createMemosTable();
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-};
+// 4. DELETE: メモ削除
+app.delete("/memos/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
 
-startServer();
+    await prisma.memo.delete({
+      where: { id: Number(id) },
+    });
+    res.status(204).send(); // 204 No Content (成功したが返す中身はない)
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to delete memo" });
+  }
+});
+
+// サーバー起動
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

@@ -1,6 +1,9 @@
 # backend/Dockerfile
 FROM node:20-alpine
 
+# ↓↓↓ 【追加】Prismaに必要なOpenSSLをインストール ↓↓↓
+RUN apk add --no-cache openssl
+
 # コンテナ内の作業ディレクトリを設定
 WORKDIR /app
 
