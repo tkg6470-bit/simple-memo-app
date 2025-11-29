@@ -1,0 +1,8 @@
+{
+  "name": "Memo App Frontend",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "frontend",
+  "workspaceFolder": "/app",
+  "shutdownAction": "none",
+  "remoteUser": "node"
+}

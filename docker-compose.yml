@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  # 1. データベースサービス (PostgreSQL)
+  # 1. データベースサービス
   db:
     image: postgres:16-alpine
     container_name: memo-db
@@ -15,7 +15,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 
-  # 2. バックエンドサービス (Node.js / Express)
+  # 2. バックエンドサービス
   backend:
     build:
       context: ./backend
@@ -33,30 +33,27 @@ services:
       DB_PORT: 5432
     depends_on:
       - db
-    # ホットリロード(自動再起動)を有効にする
-    command: npm run dev
+    command: npx ts-node index.ts
 
-  # 3. フロントエンドサービス (React / TypeScript)
+  # 3. フロントエンドサービス
   frontend:
     build:
       context: ./frontend
     container_name: memo-frontend
     volumes:
       - ./frontend:/app
-      # ★復活: コンテナ内の node_modules を守るための設定 (react-scripts not found 対策)
       - /app/node_modules
     ports:
-      - "3000:3000"
+      - "5173:5173"
     environment:
       NODE_ENV: development
-      # 重要: ReactのホットリロードをDockerで効かせる設定
-      WATCHPACK_POLLING: "true"
-      REACT_APP_API_URL: http://localhost:8080/api
+      CHOKIDAR_USEPOLLING: "true"
     stdin_open: true
     tty: true
     depends_on:
       - backend
+    # コンテナを落とさないための待機コマンド（重要）
+    command: tail -f /dev/null
 
-# ★復活: DBのボリューム定義 (undefined volume エラー対策)
 volumes:
   postgres_data:
