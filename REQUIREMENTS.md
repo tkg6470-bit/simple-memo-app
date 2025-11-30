@@ -73,7 +73,7 @@ Version: 1.5.0 (Dev Container Supported)
 
 \#\#\# **\*\*5.1 技術スタック\*\***  
 \- **\*\*Frontend\*\***: React (Vite), Axios, Tailwind CSS  
-\- **\*\*Backend\*\***: Node.js (Express), Prisma  
+\- **\*\*Backend\*\***: Node.js (Hono), Prisma  
 \- **\*\*Database\*\***: PostgreSQL (Docker / pgvector)  
 \- **\*\*Infrastructure\*\***: Docker Compose, **\*\*Dev Containers\*\***, AWS (App Runner, S3), Terraform  
 \- **\*\*Language\*\***: TypeScript
