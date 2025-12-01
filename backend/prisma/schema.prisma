@@ -14,12 +14,15 @@ generator client {
 
 // 📝 Memoモデルの定義
 model Memo {
-  id         Int      @id @default(autoincrement()) // SERIAL PRIMARY KEY
-  title      String   @db.VarChar(255)              // VARCHAR(255)
-  content    String   @db.Text                      // TEXT
-  created_at DateTime @default(now())               // DEFAULT CURRENT_TIMESTAMP
-  updated_at DateTime @default(now()) @updatedAt    // 自動更新
+  id        Int      @id @default(autoincrement())
+  
+  // ★ここが追加されていればOK！
+  userId    String   @map("user_id")
 
-  // 実際のテーブル名を 'memos' に指定
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
   @@map("memos")
 }
