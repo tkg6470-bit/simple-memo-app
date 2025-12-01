@@ -4,7 +4,10 @@ import { cors } from "hono/cors";
 import memoRoutes from "./src/routes/memoRoutes";
 
 const app = new Hono();
-const PORT = 8080;
+
+// ↓↓↓ ここを変更しました ↓↓↓
+// .envファイルにPORTがあればそれを使い、なければ8080を使う設定です
+const PORT = Number(process.env.PORT) || 8080;
 
 // CORSの設定
 app.use("/*", cors());

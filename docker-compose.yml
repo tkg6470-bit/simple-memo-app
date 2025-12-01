@@ -7,11 +7,11 @@ services:
     container_name: memo-db
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: memo_app_db
+      POSTGRES_USER: ${POSTGRES_USER} # .envから読み込み
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # .envから読み込み
+      POSTGRES_DB: ${POSTGRES_DB} # .envから読み込み
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 
@@ -23,14 +23,11 @@ services:
     volumes:
       - ./backend:/app
     ports:
-      - "8080:8080"
+      - "${PORT}:${PORT}"
     environment:
       NODE_ENV: development
-      DB_HOST: db
-      DB_USER: user
-      DB_PASSWORD: password
-      DB_NAME: memo_app_db
-      DB_PORT: 5432
+      DATABASE_URL: ${DATABASE_URL} # Prismaはこれを使う
+      PORT: ${PORT}
     depends_on:
       - db
     command: npx ts-node index.ts
@@ -52,8 +49,7 @@ services:
     tty: true
     depends_on:
       - backend
-    # コンテナを落とさないための待機コマンド（重要）
-    command: tail -f /dev/null
+    command: npm run dev
 
 volumes:
   postgres_data:
