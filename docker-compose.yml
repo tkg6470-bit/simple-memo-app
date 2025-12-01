@@ -1,32 +1,42 @@
 version: "3.8"
 
 services:
-  # 1. データベースサービス
+  # 1. データベース
   db:
     image: postgres:16-alpine
     container_name: memo-db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER} # .envから読み込み
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # .envから読み込み
-      POSTGRES_DB: ${POSTGRES_DB} # .envから読み込み
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "${DB_PORT}:${DB_PORT}"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 
-  # 2. バックエンドサービス
+  # 2. バックエンド
   backend:
-    # ... (他はそのまま) ...
+    build:
+      context: ./backend
+    container_name: memo-backend
+    volumes:
+      - ./backend:/app
+    ports:
+      - "${PORT}:${PORT}"
+    # ↓↓↓ ここを変更！ ↓↓↓
+    # いちいち変数を書くのをやめて、ファイルごと渡します
+    env_file:
+      - .env
+    # environmentセクションは、Docker固有の設定(NODE_ENVなど)だけ残します
     environment:
       NODE_ENV: development
-      DATABASE_URL: ${DATABASE_URL}
-      PORT: ${PORT}
-      # ↓↓↓ これを追加 ↓↓↓
-      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+    # ↑↑↑ 変更ここまで ↑↑↑
+    depends_on:
+      - db
+    command: npx ts-node index.ts
 
-  # 3. フロントエンドサービス
+  # 3. フロントエンド
   frontend:
     build:
       context: ./frontend
@@ -36,6 +46,9 @@ services:
       - /app/node_modules
     ports:
       - "5173:5173"
+    # フロントエンドにも .env を渡す（Viteが読み込むため）
+    env_file:
+      - .env
     environment:
       NODE_ENV: development
       CHOKIDAR_USEPOLLING: "true"

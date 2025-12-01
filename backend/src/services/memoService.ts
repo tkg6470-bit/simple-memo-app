@@ -1,10 +1,8 @@
 import prisma from "../utils/prismaClient";
 
-// userId を引数に追加し、検索条件 (where) に加える
-
 export const getMemos = async (userId: string) => {
   return await prisma.memo.findMany({
-    where: { userId }, // 自分のIDと一致するものだけ取得
+    where: { userId },
     orderBy: { created_at: "desc" },
   });
 };
@@ -16,7 +14,7 @@ export const createMemo = async (
 ) => {
   return await prisma.memo.create({
     data: {
-      userId, // 作成者のIDを記録
+      userId,
       title,
       content,
     },
@@ -32,7 +30,7 @@ export const updateMemo = async (
   return await prisma.memo.update({
     where: {
       id,
-      userId, // IDだけでなく、持ち主も一致するか確認（他人のメモ書き換え防止）
+      userId, // 他人のメモを更新できないようにする
     },
     data: { title, content },
   });
@@ -42,7 +40,7 @@ export const deleteMemo = async (userId: string, id: number) => {
   return await prisma.memo.delete({
     where: {
       id,
-      userId, // 他人のメモを消せないようにする
+      userId, // 他人のメモを削除できないようにする
     },
   });
 };
