@@ -1,8 +1,8 @@
-import prisma from "../utils/prismaClient";
+import prisma from '../utils/prismaClient';
 
 export const getMemos = async () => {
   return await prisma.memo.findMany({
-    orderBy: { created_at: "desc" },
+    orderBy: { created_at: 'desc' },
   });
 };
 
@@ -12,11 +12,7 @@ export const createMemo = async (title: string, content: string) => {
   });
 };
 
-export const updateMemo = async (
-  id: number,
-  title: string,
-  content: string
-) => {
+export const updateMemo = async (id: number, title: string, content: string) => {
   return await prisma.memo.update({
     where: { id },
     data: { title, content },
