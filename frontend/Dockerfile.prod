@@ -1,0 +1,36 @@
+# --- Stage 1: Build (ビルド環境) ---
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# ビルド引数を受け取る (Viteの環境変数はビルド時に埋め込まれるため)
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+
+# 依存関係インストール
+COPY package*.json ./
+RUN npm ci
+
+# ソースコピー & ビルド
+COPY . .
+RUN npm run build
+
+# --- Stage 2: Runner (実行環境) ---
+FROM node:20-slim AS runner
+
+WORKDIR /app
+
+# 静的ファイル配信サーバー (serve) をグローバルインストール
+RUN npm install -g serve
+
+# ビルド成果物 (dist) だけをコピー
+COPY --from=builder /app/dist ./dist
+
+# ポート公開
+EXPOSE 3000
+
+# シングルページアプリケーション (SPA) モードで起動
+CMD ["serve", "-s", "dist", "-l", "3000"]

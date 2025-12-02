@@ -1,13 +1,17 @@
-import prisma from "../utils/prismaClient";
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
+
+// メモ一覧取得
 export const getMemos = async (userId: string) => {
   return await prisma.memo.findMany({
     where: { userId },
-    orderBy: { created_at: "desc" },
+    // 修正: created_at ではなく createdAt を使用します
+    orderBy: { createdAt: "desc" },
   });
 };
 
-// imageUrl (オプショナル) を追加
+// メモ作成
 export const createMemo = async (
   userId: string,
   title: string,
@@ -19,38 +23,32 @@ export const createMemo = async (
       userId,
       title,
       content,
-      imageUrl, // DBに保存 (undefinedならnull扱いになる)
+      imageUrl,
     },
   });
 };
 
-// imageUrl (オプショナル) を追加
+// メモ更新
 export const updateMemo = async (
   userId: string,
   id: number,
-  title: string,
-  content: string,
+  title?: string,
+  content?: string,
   imageUrl?: string
 ) => {
   return await prisma.memo.update({
-    where: {
-      id,
-      userId,
-    },
+    where: { id, userId },
     data: {
       title,
       content,
-      // 画像URLがある場合のみ更新する（undefinedなら更新しない）
-      ...(imageUrl && { imageUrl }),
+      imageUrl,
     },
   });
 };
 
+// メモ削除
 export const deleteMemo = async (userId: string, id: number) => {
   return await prisma.memo.delete({
-    where: {
-      id,
-      userId,
-    },
+    where: { id, userId },
   });
 };

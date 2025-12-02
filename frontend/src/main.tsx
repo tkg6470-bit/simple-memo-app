@@ -1,19 +1,20 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import { ClerkProvider } from '@clerk/clerk-react'
+import React from "react";
+import ReactDOM from "react-dom/client";
+// 修正1: 拡張子 .tsx を削除 (TS5097エラー回避)
+import App from "./App";
+import { ClerkProvider } from "@clerk/clerk-react";
 
-// .env からキーを読み込む
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+// 修正2: 型エラー回避のため any キャストを使用 (TS2339エラー回避)
+const PUBLISHABLE_KEY = (import.meta as any).env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!PUBLISHABLE_KEY) {
-  throw new Error("Missing Publishable Key")
+  throw new Error("Missing Publishable Key");
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <App />
     </ClerkProvider>
-  </React.StrictMode>,
-)
+  </React.StrictMode>
+);
