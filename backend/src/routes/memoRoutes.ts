@@ -9,11 +9,13 @@ const app = new Hono();
 app.use("*", clerkMiddleware());
 
 app.get("/", memoController.getAllMemos);
-app.post("/", zValidator("json", createMemoSchema), memoController.createMemo);
+
+// ↓↓↓ 修正: 'json' から 'form' に変更しました！ ↓↓↓
+// これで画像付きのデータ(FormData)もチェックできるようになります
+app.post("/", zValidator("form", createMemoSchema), memoController.createMemo);
+
 app.put("/:id", memoController.updateMemo);
 app.delete("/:id", memoController.deleteMemo);
-
-// ↓↓↓ 今回追加する行 ↓↓↓
 app.post("/:id/summarize", memoController.summarizeMemo);
 
 export default app;

@@ -58,5 +58,34 @@ services:
       - backend
     command: npm run dev
 
+  # 4. ローカル用S3互換ストレージ (MinIO)
+  minio:
+    image: minio/minio
+    container_name: memo-minio
+    ports:
+      - "9000:9000" # API用ポート
+      - "9001:9001" # 管理画面(Console)用ポート
+    environment:
+      MINIO_ROOT_USER: "minio_user"
+      MINIO_ROOT_PASSWORD: "minio_password"
+    # データ永続化
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  # 5. バケット自動作成用 (起動時に 'memo-bucket' を作る係)
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://minio:9000 minio_user minio_password;
+      /usr/bin/mc mb myminio/memo-bucket;
+      /usr/bin/mc anonymous set public myminio/memo-bucket;
+      exit 0;
+      "
+
 volumes:
   postgres_data:
+  minio_data:

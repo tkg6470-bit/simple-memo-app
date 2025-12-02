@@ -7,32 +7,42 @@ export const getMemos = async (userId: string) => {
   });
 };
 
+// imageUrl (オプショナル) を追加
 export const createMemo = async (
   userId: string,
   title: string,
-  content: string
+  content: string,
+  imageUrl?: string
 ) => {
   return await prisma.memo.create({
     data: {
       userId,
       title,
       content,
+      imageUrl, // DBに保存 (undefinedならnull扱いになる)
     },
   });
 };
 
+// imageUrl (オプショナル) を追加
 export const updateMemo = async (
   userId: string,
   id: number,
   title: string,
-  content: string
+  content: string,
+  imageUrl?: string
 ) => {
   return await prisma.memo.update({
     where: {
       id,
-      userId, // 他人のメモを更新できないようにする
+      userId,
     },
-    data: { title, content },
+    data: {
+      title,
+      content,
+      // 画像URLがある場合のみ更新する（undefinedなら更新しない）
+      ...(imageUrl && { imageUrl }),
+    },
   });
 };
 
@@ -40,7 +50,7 @@ export const deleteMemo = async (userId: string, id: number) => {
   return await prisma.memo.delete({
     where: {
       id,
-      userId, // 他人のメモを削除できないようにする
+      userId,
     },
   });
 };

@@ -15,12 +15,10 @@ generator client {
 // 📝 Memoモデルの定義
 model Memo {
   id        Int      @id @default(autoincrement())
-  
-  // ★ここが追加されていればOK！
   userId    String   @map("user_id")
-
   title     String   @db.VarChar(255)
   content   String   @db.Text
+  imageUrl  String?  @map("image_url") // 画像は任意なので '?' をつける
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
 

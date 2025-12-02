@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   SignedIn,
@@ -13,6 +13,7 @@ type Memo = {
   id: number;
   title: string;
   content: string;
+  imageUrl?: string; // 画像URLを追加 (無い場合もあるので ?)
   created_at: string;
   updated_at: string;
 };
@@ -21,6 +22,9 @@ function App() {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  // ↓↓↓ 画像ファイル用のStateを追加 ↓↓↓
+  const [image, setImage] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [summaries, setSummaries] = useState<{ [key: number]: string }>({});
   const [loadingMap, setLoadingMap] = useState<{ [key: number]: boolean }>({});
@@ -29,9 +33,7 @@ function App() {
   const { getToken } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      fetchMemos();
-    }
+    if (user) fetchMemos();
   }, [user]);
 
   const getAuthHeaders = async () => {
@@ -39,6 +41,8 @@ function App() {
     return {
       headers: {
         Authorization: `Bearer ${token}`,
+        // ※FormDataを送る時は 'Content-Type': 'application/json' を書いてはいけません
+        // axiosが自動で設定してくれるので、AuthorizationだけでOKです
       },
     };
   };
@@ -50,33 +54,40 @@ function App() {
       setMemos(response.data);
     } catch (error) {
       console.error("Error fetching memos:", error);
-      // エラーを見える化
-      // alert("メモの取得に失敗しました。バックエンドが起動していない可能性があります。");
     }
   };
 
+  // ↓↓↓ 修正: 画像送信に対応 ↓↓↓
   const createMemo = async () => {
     if (!title || !content) {
       alert("タイトルと内容を入力してください");
       return;
     }
+
     try {
       const config = await getAuthHeaders();
-      await axios.post(
-        "http://localhost:8080/memos",
-        { title, content },
-        config
-      );
+
+      // JSONではなく「FormData」という形式を使います
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("content", content);
+      if (image) {
+        formData.append("image", image); // 画像があれば追加
+      }
+
+      await axios.post("http://localhost:8080/memos", formData, config);
+
+      // フォームをリセット
       setTitle("");
       setContent("");
+      setImage(null);
+      if (fileInputRef.current) fileInputRef.current.value = ""; // ファイル選択もクリア
+
       fetchMemos();
     } catch (error: any) {
       console.error("Error creating memo:", error);
-      // ↓↓↓ ここでエラー内容を表示！ ↓↓↓
       const msg = error.response?.data?.error || error.message;
-      alert(
-        `保存に失敗しました: ${msg}\n(バックエンドのログを確認してください)`
-      );
+      alert(`保存に失敗しました: ${msg}`);
     }
   };
 
@@ -95,7 +106,6 @@ function App() {
   const summarizeMemo = async (id: number) => {
     if (loadingMap[id]) return;
     setLoadingMap((prev) => ({ ...prev, [id]: true }));
-
     try {
       const config = await getAuthHeaders();
       const response = await axios.post(
@@ -105,9 +115,7 @@ function App() {
       );
       setSummaries((prev) => ({ ...prev, [id]: response.data.summary }));
     } catch (error: any) {
-      console.error("AI Error:", error);
-      const msg = error.response?.data?.error || "不明なエラー";
-      alert(`AI要約に失敗しました: ${msg}`);
+      alert("AI要約に失敗しました。");
     } finally {
       setLoadingMap((prev) => ({ ...prev, [id]: false }));
     }
@@ -132,16 +140,14 @@ function App() {
       >
         <h1>
           📝 Memo App{" "}
-          <span style={{ fontSize: "0.6em", color: "#666" }}>(AI Powered)</span>
+          <span style={{ fontSize: "0.6em", color: "#666" }}>(AI & Image)</span>
         </h1>
-
         <SignedIn>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span>{user?.fullName || user?.firstName}</span>
             <UserButton />
           </div>
         </SignedIn>
-
         <SignedOut>
           <SignInButton mode="modal">
             <button
@@ -186,19 +192,42 @@ function App() {
             }}
           />
           <textarea
-            placeholder="内容 (長文を入力してAI要約を試してみてください)"
+            placeholder="内容"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             style={{
               width: "100%",
               padding: "10px",
-              height: "120px",
+              height: "100px",
               marginBottom: "10px",
               boxSizing: "border-box",
               borderRadius: "4px",
               border: "1px solid #ccc",
             }}
           />
+
+          {/* ↓↓↓ 画像選択ボタン ↓↓↓ */}
+          <div style={{ marginBottom: "15px" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "5px",
+                fontWeight: "bold",
+                fontSize: "0.9em",
+              }}
+            >
+              画像添付 (任意):
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={(e) =>
+                setImage(e.target.files ? e.target.files[0] : null)
+              }
+            />
+          </div>
+
           <button
             onClick={createMemo}
             style={{
@@ -231,21 +260,25 @@ function App() {
               boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-              }}
-            >
-              <h3 style={{ margin: "0 0 10px 0", color: "#333" }}>
-                {memo.title}
-              </h3>
-              <div style={{ fontSize: "12px", color: "#999" }}>
-                {new Date(memo.created_at).toLocaleDateString()}{" "}
-                {new Date(memo.created_at).toLocaleTimeString()}
+            <h3 style={{ margin: "0 0 10px 0", color: "#333" }}>
+              {memo.title}
+            </h3>
+
+            {/* ↓↓↓ 画像があれば表示する ↓↓↓ */}
+            {memo.imageUrl && (
+              <div style={{ marginBottom: "15px" }}>
+                <img
+                  src={memo.imageUrl}
+                  alt="uploaded"
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "300px",
+                    borderRadius: "4px",
+                    border: "1px solid #eee",
+                  }}
+                />
               </div>
-            </div>
+            )}
 
             <p
               style={{
@@ -287,20 +320,16 @@ function App() {
                 disabled={loadingMap[memo.id]}
                 style={{
                   padding: "5px 15px",
-                  cursor: loadingMap[memo.id] ? "wait" : "pointer",
+                  cursor: "pointer",
                   backgroundColor: loadingMap[memo.id] ? "#ccc" : "#52c41a",
                   color: "white",
                   border: "none",
                   borderRadius: "4px",
                   fontSize: "14px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
                 }}
               >
                 {loadingMap[memo.id] ? "思考中..." : "✨ AI要約"}
               </button>
-
               <button
                 onClick={() => deleteMemo(memo.id)}
                 style={{
