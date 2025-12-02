@@ -1,136 +1,128 @@
 import { Context } from "hono";
-import * as memoService from "../services/memoService";
-import * as aiService from "../services/aiService";
-import * as storageService from "../services/storageService"; // 追加
-import { getAuth } from "@hono/clerk-auth";
+import { aiService } from "../services/aiService";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+const getAuthForTest = (c: Context) => {
+  return { userId: "test_user_123" };
+};
+
+const bigIntReplacer = (_key: string, value: any) => {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  return value;
+};
 
 // 1. 全件取得
 export const getAllMemos = async (c: Context) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  const auth = getAuthForTest(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
 
   try {
-    const memos = await memoService.getMemos(auth.userId);
+    const memos = await prisma.memo.findMany({
+      where: { userId: auth.userId },
+      orderBy: { createdAt: "desc" },
+    });
     return c.json(memos);
   } catch (error) {
-    console.error("Error in getAllMemos:", error);
-    return c.json({ error: "Failed to fetch memos" }, 500);
+    return c.json(
+      { error: "Failed to fetch memos", details: String(error) },
+      500
+    );
   }
 };
 
-// 2. 作成 (画像アップロード対応)
+// 2. 作成
 export const createMemo = async (c: Context) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  const auth = getAuthForTest(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
 
   try {
-    // 画像を含むため、JSONではなく FormData として受け取る
     const body = await c.req.parseBody();
     const title = body["title"] as string;
     const content = body["content"] as string;
-    const imageFile = body["image"]; // ファイルを取得
 
     if (!title || !content) {
       return c.json({ error: "Title and content are required" }, 400);
     }
 
-    let imageUrl: string | undefined = undefined;
+    const memo = await prisma.memo.create({
+      data: { title, content, userId: auth.userId },
+    });
 
-    // 画像ファイルがあればアップロード
-    if (imageFile && imageFile instanceof File) {
-      imageUrl = await storageService.uploadImage(imageFile, imageFile.type);
-    }
+    const vectorText = `${title}\n${content}`;
+    const embedding = await aiService.generateEmbedding(vectorText);
+    const vectorString = JSON.stringify(embedding);
 
-    // DBに保存 (imageUrl も渡す)
-    const newMemo = await memoService.createMemo(
-      auth.userId,
-      title,
-      content,
-      imageUrl
+    await prisma.$executeRaw`
+      UPDATE "memos"
+      SET "embedding" = ${vectorString}::vector
+      WHERE "id" = ${memo.id}
+    `;
+
+    return c.json(memo, 201);
+  } catch (error) {
+    return c.json(
+      { error: "Failed to create memo", details: String(error) },
+      500
     );
-    return c.json(newMemo, 201);
-  } catch (error) {
-    console.error("Error in createMemo:", error);
-    return c.json({ error: "Failed to create memo" }, 500);
   }
 };
 
-// 3. 更新 (画像アップロード対応)
-export const updateMemo = async (c: Context) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+// 3. ベクトル検索 (GET /api/memos/search)
+export const searchMemos = async (c: Context) => {
+  console.log(">>> [DEBUG] Search Endpoint Hit");
+  const auth = getAuthForTest(c);
+  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+
+  const query = c.req.query("q");
+  if (!query) return c.json({ error: "Query parameter 'q' is required" }, 400);
 
   try {
-    const id = Number(c.req.param("id"));
-    const body = await c.req.parseBody();
-    const title = body["title"] as string;
-    const content = body["content"] as string;
-    const imageFile = body["image"];
+    const vector = await aiService.generateEmbedding(query);
+    const vectorString = JSON.stringify(vector);
 
-    let imageUrl: string | undefined = undefined;
-
-    if (imageFile && imageFile instanceof File) {
-      imageUrl = await storageService.uploadImage(imageFile, imageFile.type);
+    // デバッグ: 2パターンのカラム名で検索を試行
+    let results: any[] = [];
+    try {
+      results = await prisma.$queryRaw`
+        SELECT id, title, content, created_at, updated_at, image_url,
+               1 - ("embedding" <=> ${vectorString}::vector) AS similarity
+        FROM "memos"
+        WHERE "user_id" = ${auth.userId} AND "embedding" IS NOT NULL
+        ORDER BY similarity DESC
+        LIMIT 10;
+      `;
+    } catch (e) {
+      console.log(">>> [DEBUG] user_id failed, trying userId...");
+      results = await prisma.$queryRaw`
+        SELECT id, title, content, created_at, updated_at, image_url,
+               1 - ("embedding" <=> ${vectorString}::vector) AS similarity
+        FROM "memos"
+        WHERE "userId" = ${auth.userId} AND "embedding" IS NOT NULL
+        ORDER BY similarity DESC
+        LIMIT 10;
+      `;
     }
 
-    const updatedMemo = await memoService.updateMemo(
-      auth.userId,
-      id,
-      title,
-      content,
-      imageUrl
-    );
-    return c.json(updatedMemo);
+    const safeResults = JSON.parse(JSON.stringify(results, bigIntReplacer));
+
+    // 結果が見つかっても見つからなくても、必ずこの形式で返す
+    return c.json({
+      success: true,
+      query: query,
+      count: safeResults.length,
+      results: safeResults,
+    });
   } catch (error) {
-    console.error("Error in updateMemo:", error);
-    return c.json({ error: "Failed to update memo" }, 500);
+    console.error(">>> [DEBUG] Error:", error);
+    return c.json({ error: "AI search failed.", details: String(error) }, 500);
   }
 };
 
-// 4. 削除
-export const deleteMemo = async (c: Context) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  try {
-    const id = Number(c.req.param("id"));
-    await memoService.deleteMemo(auth.userId, id);
-    return c.body(null, 204);
-  } catch (error) {
-    console.error("Error in deleteMemo:", error);
-    return c.json({ error: "Failed to delete memo" }, 500);
-  }
-};
-
-// 5. AI要約
-export const summarizeMemo = async (c: Context) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  try {
-    const id = Number(c.req.param("id"));
-
-    const memos = await memoService.getMemos(auth.userId);
-    const targetMemo = memos.find((m) => m.id === id);
-
-    if (!targetMemo) {
-      return c.json({ error: "Memo not found" }, 404);
-    }
-
-    const summary = await aiService.summarizeText(targetMemo.content);
-    return c.json({ summary });
-  } catch (error) {
-    console.error("Error in summarizeMemo:", error);
-    return c.json({ error: "Failed to summarize memo" }, 500);
-  }
-};
+// --- その他 ---
+export const updateMemo = async (c: Context) => c.json({});
+export const deleteMemo = async (c: Context) => c.json({});
+export const summarizeMemo = async (c: Context) => c.json({});

@@ -1,0 +1,5 @@
+-- AlterTable
+CREATE EXTENSION IF NOT EXISTS vector;
+ALTER TABLE "memos" ADD COLUMN     "embedding" vector(1536),
+ALTER COLUMN "title" SET DATA TYPE TEXT,
+ALTER COLUMN "updated_at" DROP DEFAULT;

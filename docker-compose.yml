@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  # 1. データベース
+  # 1. データベース (pgvector対応)
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: memo-db
     restart: always
     environment:
@@ -15,28 +15,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
 
-  # 2. バックエンド
+  # 2. バックエンド (Node.js/Hono)
   backend:
     build:
       context: ./backend
     container_name: memo-backend
     volumes:
       - ./backend:/app
+      - /app/node_modules # 権限エラー回避
     ports:
       - "${PORT}:${PORT}"
-    # ↓↓↓ ここを変更！ ↓↓↓
-    # いちいち変数を書くのをやめて、ファイルごと渡します
     env_file:
       - .env
-    # environmentセクションは、Docker固有の設定(NODE_ENVなど)だけ残します
     environment:
       NODE_ENV: development
-    # ↑↑↑ 変更ここまで ↑↑↑
     depends_on:
       - db
-    command: npx ts-node index.ts
+      - minio
+    # 永遠に実行し続けるコマンドを強制し、コンテナが終了するのを防ぐ
+    command: tail -f /dev/null
 
-  # 3. フロントエンド
+  # 3. フロントエンド (React/Vite)
   frontend:
     build:
       context: ./frontend
@@ -46,7 +45,6 @@ services:
       - /app/node_modules
     ports:
       - "5173:5173"
-    # フロントエンドにも .env を渡す（Viteが読み込むため）
     env_file:
       - .env
     environment:
@@ -63,17 +61,16 @@ services:
     image: minio/minio
     container_name: memo-minio
     ports:
-      - "9000:9000" # API用ポート
-      - "9001:9001" # 管理画面(Console)用ポート
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: "minio_user"
       MINIO_ROOT_PASSWORD: "minio_password"
-    # データ永続化
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
 
-  # 5. バケット自動作成用 (起動時に 'memo-bucket' を作る係)
+  # 5. バケット自動作成用
   createbuckets:
     image: minio/mc
     depends_on:

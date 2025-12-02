@@ -1,23 +1,37 @@
-// import OpenAI from 'openai'; // OpenAIは使わないのでコメントアウト
+// OpenAI APIのインポートを完全に削除 (費用を抑えるため)
+// import OpenAI from "openai";
 
-// 環境変数も使いませんが、エラーにならないようコメントアウトのままでOK
-/*
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-*/
+// 1536次元のダミーベクトルを生成するためのヘルパー関数
+const generateDummyVector = (): number[] => {
+  const DUMMY_DIMENSION = 1536;
+  const vector = new Array(DUMMY_DIMENSION).fill(0);
 
-export const summarizeText = async (text: string): Promise<string> => {
-  // 1. AIが考えているフリをする（1秒待つ）
-  // これがないと一瞬で終わってしまい、味気ないので演出として入れます
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // ダミーでも計算できるように、一部にランダムな値を入れておく
+  for (let i = 0; i < 5; i++) {
+    vector[i] = Math.random() * 0.1;
+  }
+  return vector;
+};
 
-  // 2. ダミーの要約テキストを作成
-  const mockSummary = `【AI要約(モック)】
-これは開発用のダミー要約です。
-OpenAI APIの課金なしで動作確認ができます。
--------------------
-元の文章の冒頭: ${text.substring(0, 30)}...`;
+// exportを付けて、外部からインポートできるようにします。
+export const aiService = {
+  /**
+   * 【モック実装】テキストをベクトル化する代わりに、1536次元のダミーベクトルを返します。
+   * これにより、OpenAIキーなしでDBのpgvector演算をテストできます。
+   */
+  async generateEmbedding(text: string): Promise<number[]> {
+    // 1. AIが考えているフリをする（少し待つ）
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-  return mockSummary;
+    // 2. ダミーの1536次元ベクトルを返却
+    return generateDummyVector();
+  },
+
+  /**
+   * F-07: AI 自動要約機能のスタブ。
+   */
+  async summarize(content: string): Promise<string> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return `【AI要約(モック・課金なし)】: ${content.substring(0, 30)}...`;
+  },
 };
