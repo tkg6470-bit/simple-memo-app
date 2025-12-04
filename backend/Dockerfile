@@ -1,38 +1,35 @@
+# ==========================================
+# Phase 3-1: Production Optimized Dockerfile
+# ==========================================
+
+# ベースイメージ: 軽量な Node.js 20 (Slim版)
 FROM node:20-slim
 
+# 作業ディレクトリ
 WORKDIR /app
 
-# 1. 必要なツールと AWS CLI のインストール (マルチアーキテクチャ対応)
+# 1. システム依存関係のインストール
+# Prisma が Linux (Slim) で動くために openssl が必要です
 RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    procps \
-    && \
-    # アーキテクチャを判別してダウンロードURLを切り替える
-    ARCH=$(uname -m) && \
-    if [ "$ARCH" = "aarch64" ]; then \
-      curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"; \
-    else \
-      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"; \
-    fi \
-    && unzip awscliv2.zip \
-    && ./aws/install \
-    && rm -rf awscliv2.zip ./aws \
+    openssl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. 以降は標準的なNodeの設定
+# 2. パッケージ定義のコピー & インストール
 COPY package*.json ./
 
-# 開発用なので devDependencies も含めてインストール
+# 本番環境でも tsx などを使うため、ci ではなく install を使います
+# (厳密な軽量化より安定性重視)
 RUN npm install
 
-# ソースコードは docker-compose の volumes でマウントされるため、
-# ここでの COPY . . は必須ではありませんが、一応入れておきます
+# 3. ソースコードのコピー
 COPY . .
 
-# Prisma の生成
+# 4. Prisma クライアントの生成 (必須)
+# これがないと "PrismaClientInitializationError" で落ちます
 RUN npx prisma generate
 
-# サーバー起動 (docker-compose.ymlのcommandで上書きされる場合もありますが、デフォルトを指定)
-CMD ["npm", "run", "dev"]
+# 5. アプリケーションの起動
+# npm run dev (watch mode) ではなく、tsx で直接実行します
+# ※ Render は PORT 環境変数を自動で渡すので、コード内で process.env.PORT を使う想定です
+CMD ["npx", "tsx", "src/index.ts"]
