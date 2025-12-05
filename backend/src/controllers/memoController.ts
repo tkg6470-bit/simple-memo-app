@@ -1,14 +1,12 @@
 import { Context } from "hono";
+import { getAuth } from "@hono/clerk-auth"; // 👈 Clerkから情報を取る関数
 import { aiService } from "../services/aiService";
 import { uploadImage } from "../services/storageService";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const getAuthForTest = (c: Context) => {
-  return { userId: "test_user_123" };
-};
-
+// ビッグイン整数(BigInt)をJSONにするための変換ヘルパー
 const bigIntReplacer = (_key: string, value: any) => {
   if (typeof value === "bigint") {
     return value.toString();
@@ -16,14 +14,24 @@ const bigIntReplacer = (_key: string, value: any) => {
   return value;
 };
 
+// ▼▼▼ 認証ヘルパー関数 (本番用) ▼▼▼
+const getAuthUser = (c: Context) => {
+  const auth = getAuth(c);
+  // userId がない = ログインしていない
+  if (!auth?.userId) {
+    return null;
+  }
+  return { userId: auth.userId };
+};
+
 // 1. 全件取得
 export const getAllMemos = async (c: Context) => {
-  const auth = getAuthForTest(c);
-  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const auth = getAuthUser(c); // 👈 本物のIDを取得
+  if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
   try {
     const memos = await prisma.memo.findMany({
-      where: { userId: auth.userId },
+      where: { userId: auth.userId }, // その人のメモだけ取得
       orderBy: { createdAt: "desc" },
     });
     return c.json(memos);
@@ -35,12 +43,12 @@ export const getAllMemos = async (c: Context) => {
   }
 };
 
-// 2. 作成 (日本語ファイル名対策版)
+// 2. 作成
 export const createMemo = async (c: Context) => {
   console.log(">>> [DEBUG] createMemo called");
 
-  const auth = getAuthForTest(c);
-  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const auth = getAuthUser(c); // 👈 本物のIDを取得
+  if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
   try {
     const body = await c.req.parseBody();
@@ -54,7 +62,7 @@ export const createMemo = async (c: Context) => {
 
     let imageUrl: string | null = null;
 
-    // Duck Typing判定
+    // ダックタイピングによるファイル判定
     const isFile =
       image &&
       typeof image === "object" &&
@@ -62,22 +70,28 @@ export const createMemo = async (c: Context) => {
       typeof (image as any).arrayBuffer === "function";
 
     if (isFile) {
-      console.log(">>> [DEBUG] File detected! Processing safe filename...");
+      console.log(
+        ">>> [DEBUG] File detected via Duck Typing! Starting upload..."
+      );
       const file = image as File;
 
-      // 💡 修正ポイント: 日本語ファイル名を禁止し、ランダムな英数字にする
+      // ファイル名サニタイズ
       const ext = file.name ? file.name.split(".").pop() : "png";
       const safeFileName = `${Date.now()}_${Math.random()
         .toString(36)
         .substring(7)}.${ext}`;
 
       const mimeType = file.type || "application/octet-stream";
+      // ユーザーIDごとのフォルダに保存されるようになります
       const key = `${auth.userId}/${safeFileName}`;
 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      console.log(">>> [DEBUG] Uploading as:", key);
+      console.log(
+        ">>> [DEBUG] Uploading to Bucket:",
+        process.env.AWS_BUCKET_NAME
+      );
 
       await uploadImage(key, buffer, mimeType);
 
@@ -87,30 +101,31 @@ export const createMemo = async (c: Context) => {
       );
       imageUrl = `${publicEndpoint}/${process.env.AWS_BUCKET_NAME}/${key}`;
       console.log(">>> [DEBUG] Upload success. URL:", imageUrl);
-    } else {
-      console.log(">>> [DEBUG] No file detected or invalid format.");
     }
 
+    // DB保存
     const memo = await prisma.memo.create({
       data: {
         title,
         content,
-        userId: auth.userId,
+        userId: auth.userId, // ログインユーザーのIDで保存
         imageUrl: imageUrl,
       },
     });
 
+    // ベクトル生成 (エラーでも続行)
     try {
       const vectorText = `${title}\n${content}`;
       const embedding = await aiService.generateEmbedding(vectorText);
       const vectorString = JSON.stringify(embedding);
+
       await prisma.$executeRaw`
-        UPDATE "memos" 
-        SET "embedding" = ${vectorString}::vector 
+        UPDATE "memos"
+        SET "embedding" = ${vectorString}::vector
         WHERE "id" = ${memo.id}
       `;
     } catch (e) {
-      console.error(">>> [DEBUG] Vector error (ignored):", e);
+      console.error(">>> [DEBUG] Vector generation failed (ignored):", e);
     }
 
     return c.json(memo, 201);
@@ -125,8 +140,8 @@ export const createMemo = async (c: Context) => {
 
 // 3. ベクトル検索
 export const searchMemos = async (c: Context) => {
-  const auth = getAuthForTest(c);
-  if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
+  const auth = getAuthUser(c); // 👈 本物のIDを取得
+  if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
   const query = c.req.query("q");
   if (!query) return c.json({ error: "Query parameter 'q' is required" }, 400);
@@ -135,26 +150,15 @@ export const searchMemos = async (c: Context) => {
     const vector = await aiService.generateEmbedding(query);
     const vectorString = JSON.stringify(vector);
 
-    let results: any[] = [];
-    try {
-      results = await prisma.$queryRaw`
-        SELECT id, title, content, created_at, updated_at, image_url,
-               1 - ("embedding" <=> ${vectorString}::vector) AS similarity
-        FROM "memos"
-        WHERE "user_id" = ${auth.userId} AND "embedding" IS NOT NULL
-        ORDER BY similarity DESC
-        LIMIT 10;
-      `;
-    } catch (e) {
-      results = await prisma.$queryRaw`
+    // SQL内で user_id = auth.userId を指定して他人のメモを除外
+    const results = await prisma.$queryRaw`
         SELECT id, title, content, created_at, updated_at, image_url,
                1 - ("embedding" <=> ${vectorString}::vector) AS similarity
         FROM "memos"
         WHERE "userId" = ${auth.userId} AND "embedding" IS NOT NULL
         ORDER BY similarity DESC
         LIMIT 10;
-      `;
-    }
+    `;
 
     const safeResults = JSON.parse(JSON.stringify(results, bigIntReplacer));
 
@@ -169,16 +173,27 @@ export const searchMemos = async (c: Context) => {
   }
 };
 
-export const updateMemo = async (c: Context) => c.json({});
-export const deleteMemo = async (c: Context) => c.json({});
-// ▼▼▼ 修正: AIを使わずにダミーテキストを返す ▼▼▼
+// 4. 更新
+export const updateMemo = async (c: Context) => {
+  const auth = getAuthUser(c);
+  if (!auth) return c.json({ error: "Unauthorized" }, 401);
+  // 実装が必要ならここに記述 (userIdチェック必須)
+  return c.json({});
+};
+
+// 5. 削除
+export const deleteMemo = async (c: Context) => {
+  const auth = getAuthUser(c);
+  if (!auth) return c.json({ error: "Unauthorized" }, 401);
+  // 実装が必要ならここに記述 (userIdチェック必須)
+  return c.json({});
+};
+
+// 6. 要約 (Mock)
 export const summarizeMemo = async (c: Context) => {
   console.log(">>> [DEBUG] summarizeMemo called (Mock Mode)");
-
-  // 1. 少し待機させて「AIが考えているフリ」をする (1秒)
+  // ダミー待機
   await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // 2. 固定のダミーテキストを返す
   return c.json({
     summary:
       "【ダミー要約】これはテスト用のレスポンスです。OpenAI APIの課金を防ぐため、実際のAI処理はスキップされました。ここに本来は要約文が入ります。",

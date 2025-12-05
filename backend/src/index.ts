@@ -1,11 +1,12 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { clerkMiddleware } from "@hono/clerk-auth"; // 👈 追加
 import memoRoutes from "./routes/memoRoutes";
 
 const app = new Hono();
 
-// ▼▼▼ 1. ログ出力を強化（Originも表示） ▼▼▼
+// 1. グローバルログ
 app.use("*", async (c, next) => {
   const origin = c.req.header("Origin");
   console.log(
@@ -14,18 +15,14 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// ▼▼▼ 2. CORS設定を「柔軟」に修正 ▼▼▼
+// 2. CORS設定
 app.use(
   "/*",
   cors({
     origin: (origin) => {
-      // ▼▼▼ 追加: フロントエンドの本番URLを許可 (末尾の / は不要) ▼▼▼
       if (origin === "https://simple-memo-frontend.onrender.com") return origin;
-
-      // 既存の設定
       if (origin === "https://simple-memo-backend.onrender.com") return origin;
       if (origin && origin.startsWith("http://localhost:")) return origin;
-
       return origin;
     },
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
@@ -36,10 +33,15 @@ app.use(
   })
 );
 
+// 3. Clerk認証ミドルウェア (これが無いと userId が取れません！)
+app.use("*", clerkMiddleware());
+
+// 4. ルート適用
 app.route("/api/memos", memoRoutes);
 
+// ヘルスチェック
 app.get("/", (c) => {
-  return c.text("Simple Memo Backend is Running! (Ver. CORS-Fixed)");
+  return c.text("Simple Memo Backend is Running! (Ver. Auth-Enabled)");
 });
 
 const port = 8080;
