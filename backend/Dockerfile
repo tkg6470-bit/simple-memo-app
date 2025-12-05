@@ -1,28 +1,23 @@
-# ==========================================
-# Phase 3-1: Production Optimized Dockerfile
-# ==========================================
-
-# ベースイメージ: 軽量な Node.js 20 (Slim版)
+# ベースイメージ
 FROM node:20-slim
 
 # 作業ディレクトリ
 WORKDIR /app
 
+# パッケージ定義をコピー
 COPY package*.json ./
 
-# 1. installを実行
-RUN npm install
+# ⚠️ ポイント1: 開発ツールを除外してインストール（高速・軽量化）
+RUN npm ci --omit=dev
 
-# 2. ソースコードをコピー
+# ⚠️ ポイント2: ソースコード一式（distフォルダ含む）をコピー
 COPY . .
 
-# 3. コピーした後にPrismaを生成（これを追加！）
+# データベース接続ツールの準備
 RUN npx prisma generate
 
-# 4. ビルド（TypeScript -> JavaScript）
-RUN npm run build
+# ⚠️ ポイント3: ビルドコマンド（npm run build）は削除しました！
+# 手元で作った dist を使うので、ここでは何もしなくてOKです。
 
-# 5. アプリケーションの起動
-# npm run dev (watch mode) ではなく、tsx で直接実行します
-# ※ Render は PORT 環境変数を自動で渡すので、コード内で process.env.PORT を使う想定です
-CMD ["npx", "tsx", "src/index.ts"]
+# アプリケーションの起動（tsx ではなく node で動かします）
+CMD ["node", "dist/index.js"]
