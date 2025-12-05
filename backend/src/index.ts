@@ -1,24 +1,33 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-// 👇 default export を受け取る書き方に統一
 import memoRoutes from "./routes/memoRoutes";
 
 const app = new Hono();
 
-// ▼▼▼ 1. 全リクエストログ (検問) ▼▼▼
+// ▼▼▼ 1. ログ出力を強化（Originも表示） ▼▼▼
 app.use("*", async (c, next) => {
+  const origin = c.req.header("Origin");
   console.log(
-    `>>> [GLOBAL LOG] Incoming Request: ${c.req.method} ${c.req.url}`
+    `>>> [GLOBAL LOG] Request: ${c.req.method} ${c.req.url} (Origin: ${origin})`
   );
   await next();
 });
 
-// ▼▼▼ 2. CORS設定 ▼▼▼
+// ▼▼▼ 2. CORS設定を「柔軟」に修正 ▼▼▼
 app.use(
   "/*",
   cors({
-    origin: ["http://localhost:5173", "https://simple-memo.onrender.com"],
+    origin: (origin) => {
+      // 本番環境 (Render) は許可
+      if (origin === "https://simple-memo.onrender.com") return origin;
+
+      // ローカル開発 (localhost) は、ポート番号問わずすべて許可
+      if (origin && origin.startsWith("http://localhost:")) return origin;
+
+      // それ以外は許可しない（またはデバッグ用に許可）
+      return origin; // 一時的に全許可して動作確認したい場合はここを return origin にする
+    },
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     exposeHeaders: ["Content-Length"],
@@ -27,12 +36,10 @@ app.use(
   })
 );
 
-// ルート適用
 app.route("/api/memos", memoRoutes);
 
-// ▼▼▼ 3. バージョン確認用エンドポイント ▼▼▼
 app.get("/", (c) => {
-  return c.text("Simple Memo Backend is Running! (Ver. Fixed-Routes)");
+  return c.text("Simple Memo Backend is Running! (Ver. CORS-Fixed)");
 });
 
 const port = 8080;
