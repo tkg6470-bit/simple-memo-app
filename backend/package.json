@@ -7,7 +7,7 @@
     "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "nodemon ...",
-    "postinstall": "npx prisma generate"    <--- この行を追加してください！
+    "postinstall": "npx prisma generate"    
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
