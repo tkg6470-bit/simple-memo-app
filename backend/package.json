@@ -6,7 +6,8 @@
   "scripts": {
     "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon --watch '**/*.ts' --exec \"ts-node\" src/index.ts"
+    "dev": "nodemon ...",
+    "render-build": "npm install && npm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
