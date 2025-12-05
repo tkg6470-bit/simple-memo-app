@@ -19,14 +19,14 @@ app.use(
   "/*",
   cors({
     origin: (origin) => {
-      // 本番環境 (Render) は許可
-      if (origin === "https://simple-memo.onrender.com") return origin;
+      // ▼▼▼ 追加: フロントエンドの本番URLを許可 (末尾の / は不要) ▼▼▼
+      if (origin === "https://simple-memo-frontend.onrender.com") return origin;
 
-      // ローカル開発 (localhost) は、ポート番号問わずすべて許可
+      // 既存の設定
+      if (origin === "https://simple-memo-backend.onrender.com") return origin;
       if (origin && origin.startsWith("http://localhost:")) return origin;
 
-      // それ以外は許可しない（またはデバッグ用に許可）
-      return origin; // 一時的に全許可して動作確認したい場合はここを return origin にする
+      return origin;
     },
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
