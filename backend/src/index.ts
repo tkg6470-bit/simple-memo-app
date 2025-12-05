@@ -1,12 +1,12 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-// 👇 修正箇所: { memoRoutes } ではなく memoRoutes に変更
+// 👇 default export を受け取る書き方に統一
 import memoRoutes from "./routes/memoRoutes";
 
 const app = new Hono();
 
-// ▼▼▼ 1. すべての通信をログに出す「検問」を追加 (最重要) ▼▼▼
+// ▼▼▼ 1. 全リクエストログ (検問) ▼▼▼
 app.use("*", async (c, next) => {
   console.log(
     `>>> [GLOBAL LOG] Incoming Request: ${c.req.method} ${c.req.url}`
@@ -14,15 +14,11 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// CORS設定
+// ▼▼▼ 2. CORS設定 ▼▼▼
 app.use(
   "/*",
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://simple-memo.onrender.com",
-      // 必要に応じて本番フロントエンドのURLを追加
-    ],
+    origin: ["http://localhost:5173", "https://simple-memo.onrender.com"],
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     exposeHeaders: ["Content-Length"],
@@ -31,13 +27,12 @@ app.use(
   })
 );
 
-// ルート設定
+// ルート適用
 app.route("/api/memos", memoRoutes);
 
-// ▼▼▼ 2. 生存確認用のメッセージを変更 (デプロイ確認用) ▼▼▼
+// ▼▼▼ 3. バージョン確認用エンドポイント ▼▼▼
 app.get("/", (c) => {
-  console.log(">>> [GLOBAL LOG] Health Check Hit!");
-  return c.text("Simple Memo Backend is Running! (Ver. Debug)");
+  return c.text("Simple Memo Backend is Running! (Ver. Fixed-Routes)");
 });
 
 const port = 8080;

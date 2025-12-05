@@ -1,14 +1,16 @@
 import axios from "axios";
 import { Memo, SearchResponse } from "../types/memo";
 
-// TypeScriptエラー回避: import.meta.env が認識されない場合の対処
-// (import.meta as any) で型チェックを一時的に無効化します
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080/api";
+const API_BASE_URL = "https://simple-memo-backend.onrender.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
+
+export const getMemos = async () => {
+  const response = await api.get("/");
+  return response.data;
+};
 
 export const memoApi = {
   // 全件取得
