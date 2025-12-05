@@ -36,9 +36,9 @@ export const getAllMemos = async (c: Context) => {
   }
 };
 
-// 2. 作成 (デバッグログ追加版)
+// 2. 作成 (Duck Typing 修正版)
 export const createMemo = async (c: Context) => {
-  console.log(">>> [DEBUG] createMemo called");
+  console.log(">>> [DEBUG] createMemo called (Duck Typing Fix)");
 
   const auth = getAuthForTest(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
@@ -49,73 +49,56 @@ export const createMemo = async (c: Context) => {
     const content = body["content"] as string;
     const image = body["image"];
 
-    // ▼▼▼ 受信データの中身を確認 ▼▼▼
-    console.log(">>> [DEBUG] Body received:", { title, content });
-    console.log(">>> [DEBUG] Image raw type:", typeof image);
-
-    // imageがFileオブジェクトかどうか詳しく見る
-    if (image && typeof image === "object") {
-      console.log(">>> [DEBUG] Image object keys:", Object.keys(image));
-      console.log(">>> [DEBUG] Is File instance?:", image instanceof File);
-      if (image instanceof File) {
-        console.log(">>> [DEBUG] File details:", {
-          name: image.name,
-          size: image.size,
-          type: image.type,
-        });
-      }
-    } else {
-      console.log(">>> [DEBUG] Image is not an object or null");
-    }
-
     if (!title || !content) {
       return c.json({ error: "Title and content are required" }, 400);
     }
 
     let imageUrl: string | null = null;
 
-    // ▼▼▼ 画像アップロード処理 ▼▼▼
-    if (image instanceof File && image.size > 0) {
-      console.log(">>> [DEBUG] Start uploading image process...");
+    // 💡 修正ポイント: instanceof File をやめ、機能で判定する (Duck Typing)
+    // 「オブジェクトであり、かつ arrayBuffer という関数を持っているならファイルとみなす」
+    const isFile =
+      image &&
+      typeof image === "object" &&
+      "arrayBuffer" in image &&
+      typeof (image as any).arrayBuffer === "function";
 
-      const fileExtension = image.name.split(".").pop() || "png";
-      const mimeType = image.type;
-      const fileName = `${Date.now()}_${image.name}`;
+    if (isFile) {
+      console.log(
+        ">>> [DEBUG] File detected via Duck Typing! Starting upload..."
+      );
+      const file = image as File; // 型アサーション
+
+      // ファイル名やタイプの安全な取得
+      const fileNameRaw = file.name || "image.png";
+      const mimeType = file.type || "application/octet-stream";
+      const fileName = `${Date.now()}_${fileNameRaw}`;
       const key = `${auth.userId}/${fileName}`;
 
-      const arrayBuffer = await image.arrayBuffer();
+      // バッファ変換
+      const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // 環境変数が取れているか確認
       console.log(
-        ">>> [DEBUG] Env Check - AWS_BUCKET_NAME:",
+        ">>> [DEBUG] Uploading to Bucket:",
         process.env.AWS_BUCKET_NAME
       );
-      console.log(
-        ">>> [DEBUG] Env Check - AWS_REGION:",
-        process.env.AWS_REGION
-      );
 
-      try {
-        await uploadImage(key, buffer, mimeType);
-        console.log(">>> [DEBUG] Upload to Supabase success!");
-      } catch (uploadError) {
-        console.error(
-          ">>> [DEBUG] Upload failed inside uploadImage:",
-          uploadError
-        );
-        throw uploadError; // ここでエラーを投げて下のcatchブロックで拾う
-      }
+      // アップロード実行
+      await uploadImage(key, buffer, mimeType);
 
+      // 公開URL生成
       const publicEndpoint = process.env.AWS_ENDPOINT?.replace(
         "/storage/v1/s3",
         "/storage/v1/object/public"
       );
       imageUrl = `${publicEndpoint}/${process.env.AWS_BUCKET_NAME}/${key}`;
-      console.log(">>> [DEBUG] Generated Image URL:", imageUrl);
+      console.log(">>> [DEBUG] Upload success. URL:", imageUrl);
     } else {
+      // ファイルではない、またはサイズ0などの場合
       console.log(
-        ">>> [DEBUG] Image upload skipped. Reason: Not a File instance or size is 0"
+        ">>> [DEBUG] No valid file detected. Image type:",
+        typeof image
       );
     }
 
@@ -129,20 +112,24 @@ export const createMemo = async (c: Context) => {
       },
     });
 
-    // ベクトル生成・保存
-    const vectorText = `${title}\n${content}`;
-    const embedding = await aiService.generateEmbedding(vectorText);
-    const vectorString = JSON.stringify(embedding);
+    // ベクトル生成・保存 (エラーになってもメモ作成自体は成功させるためtry-catchを分離)
+    try {
+      const vectorText = `${title}\n${content}`;
+      const embedding = await aiService.generateEmbedding(vectorText);
+      const vectorString = JSON.stringify(embedding);
 
-    await prisma.$executeRaw`
-      UPDATE "memos"
-      SET "embedding" = ${vectorString}::vector
-      WHERE "id" = ${memo.id}
-    `;
+      await prisma.$executeRaw`
+        UPDATE "memos"
+        SET "embedding" = ${vectorString}::vector
+        WHERE "id" = ${memo.id}
+      `;
+    } catch (e) {
+      console.error(">>> [DEBUG] Vector generation failed (ignored):", e);
+    }
 
     return c.json(memo, 201);
   } catch (error) {
-    console.error(">>> [DEBUG] Create memo failed (Catch Block):", error);
+    console.error(">>> [DEBUG] Create memo failed:", error);
     return c.json(
       { error: "Failed to create memo", details: String(error) },
       500
