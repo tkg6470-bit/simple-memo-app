@@ -8,26 +8,19 @@ FROM node:20-slim
 # 作業ディレクトリ
 WORKDIR /app
 
-# 1. システム依存関係のインストール
-# Prisma が Linux (Slim) で動くために openssl が必要です
-RUN apt-get update && apt-get install -y \
-    openssl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# 2. パッケージ定義のコピー & インストール
 COPY package*.json ./
 
-# 本番環境でも tsx などを使うため、ci ではなく install を使います
-# (厳密な軽量化より安定性重視)
+# 1. installを実行
 RUN npm install
 
-# 3. ソースコードのコピー
+# 2. ソースコードをコピー
 COPY . .
 
-# 4. Prisma クライアントの生成 (必須)
-# これがないと "PrismaClientInitializationError" で落ちます
+# 3. コピーした後にPrismaを生成（これを追加！）
 RUN npx prisma generate
+
+# 4. ビルド（TypeScript -> JavaScript）
+RUN npm run build
 
 # 5. アプリケーションの起動
 # npm run dev (watch mode) ではなく、tsx で直接実行します

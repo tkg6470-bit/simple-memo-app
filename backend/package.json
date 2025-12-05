@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "description": "Node.js Hono backend for Memo App",
   "main": "dist/index.js",
-"scripts": {
+  "scripts": {
     "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon ...",
-    "postinstall": "npx prisma generate"    
+    "dev": "nodemon ..."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
