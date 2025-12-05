@@ -171,4 +171,16 @@ export const searchMemos = async (c: Context) => {
 
 export const updateMemo = async (c: Context) => c.json({});
 export const deleteMemo = async (c: Context) => c.json({});
-export const summarizeMemo = async (c: Context) => c.json({});
+// ▼▼▼ 修正: AIを使わずにダミーテキストを返す ▼▼▼
+export const summarizeMemo = async (c: Context) => {
+  console.log(">>> [DEBUG] summarizeMemo called (Mock Mode)");
+
+  // 1. 少し待機させて「AIが考えているフリ」をする (1秒)
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // 2. 固定のダミーテキストを返す
+  return c.json({
+    summary:
+      "【ダミー要約】これはテスト用のレスポンスです。OpenAI APIの課金を防ぐため、実際のAI処理はスキップされました。ここに本来は要約文が入ります。",
+  });
+};
