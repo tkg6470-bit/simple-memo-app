@@ -4,7 +4,7 @@
   "description": "Node.js Hono backend for Memo App",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --watch '**/*.ts' --exec \"ts-node\" src/index.ts"
   },
