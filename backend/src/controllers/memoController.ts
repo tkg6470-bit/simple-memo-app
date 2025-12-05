@@ -6,7 +6,6 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const getAuthForTest = (c: Context) => {
-  // 本来は c.get('auth') などでClerkの情報を取ります
   return { userId: "test_user_123" };
 };
 
@@ -36,9 +35,9 @@ export const getAllMemos = async (c: Context) => {
   }
 };
 
-// 2. 作成 (Duck Typing 修正版)
+// 2. 作成 (日本語ファイル名対策版)
 export const createMemo = async (c: Context) => {
-  console.log(">>> [DEBUG] createMemo called (Duck Typing Fix)");
+  console.log(">>> [DEBUG] createMemo called");
 
   const auth = getAuthForTest(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
@@ -55,8 +54,7 @@ export const createMemo = async (c: Context) => {
 
     let imageUrl: string | null = null;
 
-    // 💡 修正ポイント: instanceof File をやめ、機能で判定する (Duck Typing)
-    // 「オブジェクトであり、かつ arrayBuffer という関数を持っているならファイルとみなす」
+    // Duck Typing判定
     const isFile =
       image &&
       typeof image === "object" &&
@@ -64,30 +62,25 @@ export const createMemo = async (c: Context) => {
       typeof (image as any).arrayBuffer === "function";
 
     if (isFile) {
-      console.log(
-        ">>> [DEBUG] File detected via Duck Typing! Starting upload..."
-      );
-      const file = image as File; // 型アサーション
+      console.log(">>> [DEBUG] File detected! Processing safe filename...");
+      const file = image as File;
 
-      // ファイル名やタイプの安全な取得
-      const fileNameRaw = file.name || "image.png";
+      // 💡 修正ポイント: 日本語ファイル名を禁止し、ランダムな英数字にする
+      const ext = file.name ? file.name.split(".").pop() : "png";
+      const safeFileName = `${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(7)}.${ext}`;
+
       const mimeType = file.type || "application/octet-stream";
-      const fileName = `${Date.now()}_${fileNameRaw}`;
-      const key = `${auth.userId}/${fileName}`;
+      const key = `${auth.userId}/${safeFileName}`;
 
-      // バッファ変換
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      console.log(
-        ">>> [DEBUG] Uploading to Bucket:",
-        process.env.AWS_BUCKET_NAME
-      );
+      console.log(">>> [DEBUG] Uploading as:", key);
 
-      // アップロード実行
       await uploadImage(key, buffer, mimeType);
 
-      // 公開URL生成
       const publicEndpoint = process.env.AWS_ENDPOINT?.replace(
         "/storage/v1/s3",
         "/storage/v1/object/public"
@@ -95,14 +88,9 @@ export const createMemo = async (c: Context) => {
       imageUrl = `${publicEndpoint}/${process.env.AWS_BUCKET_NAME}/${key}`;
       console.log(">>> [DEBUG] Upload success. URL:", imageUrl);
     } else {
-      // ファイルではない、またはサイズ0などの場合
-      console.log(
-        ">>> [DEBUG] No valid file detected. Image type:",
-        typeof image
-      );
+      console.log(">>> [DEBUG] No file detected or invalid format.");
     }
 
-    // DB保存
     const memo = await prisma.memo.create({
       data: {
         title,
@@ -112,19 +100,17 @@ export const createMemo = async (c: Context) => {
       },
     });
 
-    // ベクトル生成・保存 (エラーになってもメモ作成自体は成功させるためtry-catchを分離)
     try {
       const vectorText = `${title}\n${content}`;
       const embedding = await aiService.generateEmbedding(vectorText);
       const vectorString = JSON.stringify(embedding);
-
       await prisma.$executeRaw`
-        UPDATE "memos"
-        SET "embedding" = ${vectorString}::vector
+        UPDATE "memos" 
+        SET "embedding" = ${vectorString}::vector 
         WHERE "id" = ${memo.id}
       `;
     } catch (e) {
-      console.error(">>> [DEBUG] Vector generation failed (ignored):", e);
+      console.error(">>> [DEBUG] Vector error (ignored):", e);
     }
 
     return c.json(memo, 201);
@@ -139,7 +125,6 @@ export const createMemo = async (c: Context) => {
 
 // 3. ベクトル検索
 export const searchMemos = async (c: Context) => {
-  console.log(">>> [DEBUG] Search Endpoint Hit");
   const auth = getAuthForTest(c);
   if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
 
@@ -161,7 +146,6 @@ export const searchMemos = async (c: Context) => {
         LIMIT 10;
       `;
     } catch (e) {
-      console.log(">>> [DEBUG] user_id failed, trying userId...");
       results = await prisma.$queryRaw`
         SELECT id, title, content, created_at, updated_at, image_url,
                1 - ("embedding" <=> ${vectorString}::vector) AS similarity
@@ -181,12 +165,10 @@ export const searchMemos = async (c: Context) => {
       results: safeResults,
     });
   } catch (error) {
-    console.error(">>> [DEBUG] Error:", error);
     return c.json({ error: "AI search failed.", details: String(error) }, 500);
   }
 };
 
-// --- その他 ---
 export const updateMemo = async (c: Context) => c.json({});
 export const deleteMemo = async (c: Context) => c.json({});
 export const summarizeMemo = async (c: Context) => c.json({});
