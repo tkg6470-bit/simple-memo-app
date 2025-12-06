@@ -6,7 +6,8 @@
   "scripts": {
     "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon ..."
+    "dev": "nodemon ...",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
