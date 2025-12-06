@@ -19,7 +19,13 @@ export const aiService = {
    * 【モック実装】テキストをベクトル化する代わりに、1536次元のダミーベクトルを返します。
    * これにより、OpenAIキーなしでDBのpgvector演算をテストできます。
    */
-  async generateEmbedding(text: string): Promise<number[]> {
+  async generateEmbedding(_text: string): Promise<number[]> {
+    // ▼▼▼ 修正: 変数を使わないとエラーになるため、ログ出力して「使用済み」にする ▼▼▼
+    console.log(
+      ">>> [DEBUG] Generating dummy embedding for:",
+      _text.substring(0, 20) + "..."
+    );
+
     // 1. AIが考えているフリをする（少し待つ）
     await new Promise((resolve) => setTimeout(resolve, 50));
 

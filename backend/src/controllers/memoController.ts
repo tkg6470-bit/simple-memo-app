@@ -7,6 +7,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // ビッグイン整数(BigInt)をJSONにするための変換ヘルパー
+// ▼▼▼ 修正: anyの使用を許可 ▼▼▼
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const bigIntReplacer = (_key: string, value: any) => {
   if (typeof value === "bigint") {
     return value.toString();
@@ -51,6 +53,8 @@ export const createMemo = async (c: Context) => {
   if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
   try {
+    // ▼▼▼ 修正: anyの使用を許可 (parseBodyの戻り値がanyのため) ▼▼▼
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = await c.req.parseBody();
     const title = body["title"] as string;
     const content = body["content"] as string;
@@ -67,6 +71,8 @@ export const createMemo = async (c: Context) => {
       image &&
       typeof image === "object" &&
       "arrayBuffer" in image &&
+      // ▼▼▼ 修正: anyの使用を許可 (ダックタイピングのため) ▼▼▼
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       typeof (image as any).arrayBuffer === "function";
 
     if (isFile) {
