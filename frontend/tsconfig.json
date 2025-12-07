@@ -15,21 +15,20 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["vite/client", "node"],
-    "baseUrl": ".",
 
-    // ▼▼▼ ここが重要！ワイルドカードを使わず、個別に指定します ▼▼▼
+    "baseUrl": ".",
     "paths": {
-      // Backend Alias
-      "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // 必要なライブラリだけ node_modules を見るように指定
+      // ▼ Honoのパスを個別に完璧に指定します
       "hono": ["./node_modules/hono"],
-      "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
-      "@hono/*": ["./node_modules/@hono/*"],
-      "zod": ["./node_modules/zod"],
-      "@prisma/client": ["./node_modules/@prisma/client"],
-      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
+      "hono/cors": ["./node_modules/hono/dist/cors"],
+      "hono/client": ["./node_modules/hono/dist/client"],
+      "hono/*": ["./node_modules/hono/dist/*"],
+
+      // ▼ 他のすべてのライブラリ（React, Prisma, Zodなど）はここで拾います
+      // node_modules と @types の両方を見るように設定しました！
+      "*": ["./node_modules/*", "./node_modules/@types/*"]
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
