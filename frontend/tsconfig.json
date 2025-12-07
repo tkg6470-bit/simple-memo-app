@@ -15,23 +15,30 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    "types": ["vite/client", "node"],
-
     "baseUrl": ".",
+
+    // ▼▼▼ 修正点 1: "types" 行を削除しました！ ▼▼▼
+    // これにより @types/react などが自動的にすべて読み込まれます。
+
+    // ▼▼▼ 修正点 2: paths は Hono だけ特別扱いします ▼▼▼
     "paths": {
-      // 1. バックエンドへのエイリアス
+      // Backend Alias
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // 2. Hono用の特別なルート (ここが優先されます)
+      // Hono Fix (バックエンド用ライブラリのパス解決)
       "hono": ["./node_modules/hono"],
       "hono/cors": ["./node_modules/hono/dist/cors"],
       "hono/client": ["./node_modules/hono/dist/client"],
       "hono/*": ["./node_modules/hono/dist/*"],
       "@hono/*": ["./node_modules/@hono/*"],
 
-      // 3. その他のライブラリ用の一般的なルート (Reactなどはここを通ります)
-      "*": ["./node_modules/*", "./node_modules/@types/*"]
+      // その他のバックエンド用
+      "zod": ["./node_modules/zod"],
+      "@prisma/client": ["./node_modules/@prisma/client"],
+      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
+
+      // ワイルドカード "*" は不要なので削除しました
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
