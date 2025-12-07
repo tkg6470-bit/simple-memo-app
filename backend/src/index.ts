@@ -45,4 +45,5 @@ console.log(`Server is running on port ${port}`);
 serve({
   fetch: app.fetch,
   port,
-  hostname: '0.0.
+  hostname: "0.0.0.0", // 👈 ここを修正・補完しました
+});
