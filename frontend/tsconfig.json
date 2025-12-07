@@ -14,22 +14,29 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-
     "baseUrl": ".",
 
-    // ▼ 修正1: これでバックエンドの細かい型エラーを無視します（ビルドを通すため）
-    "noImplicitAny": false,
-
-    // ▼ 修正2: 必要な型定義をすべてリストアップします（ReactもViteも復活！）
+    // ▼ 1. React/Vite用の設定 (Reactエラー対策)
+    // 必要な型定義を明示的に読み込みます
     "types": ["vite/client", "node", "react", "react-dom"],
+
+    // ▼ 2. バックエンドの型チェックを緩める設定
+    "noImplicitAny": false,
 
     "paths": {
       // バックエンドへのエイリアス
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // ▼ 修正3: HonoもReactもすべてここ（node_modules）から探すように指示
-      // これが一番強力で確実な方法です
+      // ▼ 3. Hono用の個別パス設定 (Honoエラー対策)
+      // これが無いと hono/cors が見つかりません
+      "hono": ["./node_modules/hono"],
+      "hono/cors": ["./node_modules/hono/dist/cors"],
+      "hono/client": ["./node_modules/hono/dist/client"],
+      "hono/*": ["./node_modules/hono/dist/*"],
+      "@hono/*": ["./node_modules/@hono/*"],
+
+      // ▼ 4. その他のライブラリ用の保険
       "*": ["./node_modules/*"]
     }
   },
