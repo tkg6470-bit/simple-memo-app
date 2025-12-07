@@ -1,0 +1,41 @@
+services:
+  # ----------------------------------------
+  # Backend Service (Hono + Node.js)
+  # ----------------------------------------
+  - type: web
+    name: simple-memo-backend
+    env: docker # Dockerfileを使用
+    plan: free # Free Tierを利用
+    region: singapore # 日本に近いリージョン推奨
+    branch: main
+
+    # 環境変数の設定 (要件定義書 3.1 より)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromGroup: shared-secrets # セキュアな変数はグループ管理推奨
+      - key: SUPABASE_URL
+        fromGroup: shared-secrets
+      - key: SUPABASE_ANON_KEY
+        fromGroup: shared-secrets
+      - key: AWS_ENDPOINT
+        value: "" # 本番は空文字あるいはSupabaseのURL等
+
+  # ----------------------------------------
+  # Frontend Service (Vite + React)
+  # ----------------------------------------
+  - type: static
+    name: simple-memo-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    branch: main
+
+    # ビルド時に環境変数を埋め込む場合
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: simple-memo-backend
+          property: url # バックエンドのURLを自動取得
