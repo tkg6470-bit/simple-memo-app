@@ -8,49 +8,41 @@ services:
     plan: free
     region: singapore
 
-    # Docker設定 (モノレポ構成用)
     rootDir: .
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
-
-    # ヘルスチェック (サーバーが起動したか確認するパス)
     healthCheckPath: /
 
-    # 環境変数
+    # 【修正1】環境変数グループは envVars の外に出しました
+    envVarGroups:
+      - shared-secrets
+
+    # 個別の環境変数はここに書きます
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 10000 # Renderのデフォルト推奨ポートに合わせておくと無難です
-      # データベース接続 (Renderダッシュボードで設定するか、shared-secretsを使用)
-      - key: DATABASE_URL
-        fromGroup: shared-secrets
-      - key: DIRECT_URL
-        fromGroup: shared-secrets
-      # 本番は Supabase Storage を使うため空文字等にする
+        value: 10000
       - key: AWS_ENDPOINT
         value: ""
 
   # ---------------------------------------------------
   # 2. Frontend Service (React + Vite)
   # ---------------------------------------------------
-  # 重要: Static Site でも type は "web" にし、env で "static" を指定します
   - type: web
     name: simple-memo-frontend
     env: static
-    region: singapore
+    # 【修正2】region を削除しました（Static Siteには不要）
 
-    # フロントエンドのディレクトリ
     rootDir: frontend
-
-    # ビルド設定
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
 
-    # バックエンドとの連携
     envVars:
       - key: VITE_API_URL
         fromService:
           type: web
           name: simple-memo-backend
-          property: url
+          # 【修正3】property を "url" から "host" に変更しました
+          # 注: これで "https://" なしのドメイン (例: my-app.onrender.com) が入ります
+          property: host
