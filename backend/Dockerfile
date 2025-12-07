@@ -7,7 +7,8 @@ WORKDIR /app
 # ⚠️ 追加: Prismaに必要なOpenSSLをインストールします
 RUN apt-get update -y && apt-get install -y openssl
 
-COPY package*.json ./
+COPY package*.json ./ 
+RUN npm ci --omit=dev
 
 # 開発ツールを除外してインストール
 RUN npm ci --omit=dev
