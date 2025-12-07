@@ -5,23 +5,22 @@ FROM node:20-slim
 WORKDIR /app
 
 # Prismaに必要なOpenSSLをインストール
-RUN apt-get update -y && apt-get install -y openssl
+RUN apt-get update -y && apt-get install -y openssl ca-certificates
 
 COPY package*.json ./ 
 
-# 【修正1】 "--omit=dev" を削除
-# ビルドには TypeScript (devDependencies) が必要なため、全てインストールします
+# 依存関係のインストール（ビルドツール含む）
 RUN npm install
 
 # ソースコード一式をコピー
 COPY . .
 
-# 【修正2】 ビルドコマンドを追加
-# これで最新の src/index.ts から 新しい dist/index.js が生成されます！
+# ビルド実行 (TypeScript -> JavaScript)
 RUN npm run build
 
-# データベース接続ツールの準備
+# Prismaクライアントの生成
 RUN npx prisma generate
 
-# アプリケーションの起動
-CMD ["node", "dist/index.js"]
+# 【修正箇所】起動コマンドを変更
+# 自動でマイグレーションを実行し、成功したらサーバーを起動します
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
