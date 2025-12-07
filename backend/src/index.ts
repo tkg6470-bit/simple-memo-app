@@ -38,11 +38,11 @@ app.route("/", routeApp);
 
 app.get("/", (c) => c.text("Backend is Running"));
 
-// 【修正箇所】環境変数 PORT を優先し、なければ 3000 (ローカル用) を使う
+// 環境変数 PORT を優先し、なければ 3000 (ローカル用) を使う
 const port = Number(process.env.PORT) || 3000;
 console.log(`Server is running on port ${port}`);
 
 serve({
   fetch: app.fetch,
-  port, // 修正した port 変数を渡す
-});
+  port,
+  hostname: '0.0.
