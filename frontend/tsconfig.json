@@ -15,19 +15,20 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    // 型定義の追加
     "types": ["vite/client", "node"],
 
-    // パス解決の設定
     "baseUrl": ".",
     "paths": {
-      // ▼ 既存の設定
+      // Backend Alias
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // ▼▼▼ 【追加】迷子のライブラリを frontend/node_modules に誘導する設定 ▼▼▼
+      // Library Mapping (Fixed for Hono v4)
       "hono": ["./node_modules/hono"],
-      "hono/*": ["./node_modules/hono/*"],
+
+      // 👇 ここを修正: distフォルダの中も探すようにしました
+      "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
+
       "@hono/*": ["./node_modules/@hono/*"],
       "zod": ["./node_modules/zod"],
       "@prisma/client": ["./node_modules/@prisma/client"],
