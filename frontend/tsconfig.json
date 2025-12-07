@@ -14,25 +14,15 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-
     "types": ["vite/client", "node"],
-
     "baseUrl": ".",
     "paths": {
       // Backend Alias
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // Library Mapping (Fixed for Hono v4)
-      "hono": ["./node_modules/hono"],
-
-      // 👇 ここを修正: distフォルダの中も探すようにしました
-      "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
-
-      "@hono/*": ["./node_modules/@hono/*"],
-      "zod": ["./node_modules/zod"],
-      "@prisma/client": ["./node_modules/@prisma/client"],
-      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
+      // 👇 【最強の解決策】 見つからないモジュールはすべて node_modules を探すように指示
+      "*": ["./node_modules/*"]
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
