@@ -8,10 +8,8 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y openssl
 
 COPY package*.json ./ 
-RUN npm ci --omit=dev
 
-# 開発ツールを除外してインストール
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # ソースコード一式（dist含む）をコピー
 COPY . .
