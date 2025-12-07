@@ -25,7 +25,7 @@ services:
   # ----------------------------------------
   # Frontend Service (Vite + React)
   # ----------------------------------------
-  - type: static
+  - type: site
     name: simple-memo-frontend
     env: static
     buildCommand: npm install && npm run build
