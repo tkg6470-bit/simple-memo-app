@@ -16,13 +16,20 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "node"],
     "baseUrl": ".",
+
+    // ▼▼▼ ここが重要！ワイルドカードを使わず、個別に指定します ▼▼▼
     "paths": {
       // Backend Alias
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // 👇 【最強の解決策】 見つからないモジュールはすべて node_modules を探すように指示
-      "*": ["./node_modules/*"]
+      // 必要なライブラリだけ node_modules を見るように指定
+      "hono": ["./node_modules/hono"],
+      "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
+      "@hono/*": ["./node_modules/@hono/*"],
+      "zod": ["./node_modules/zod"],
+      "@prisma/client": ["./node_modules/@prisma/client"],
+      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
