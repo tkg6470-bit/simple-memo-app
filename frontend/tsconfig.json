@@ -16,24 +16,21 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
 
-    // エラー解消用設定
     "noImplicitAny": false,
     "types": ["vite/client", "node", "react", "react-dom"],
 
     "paths": {
-      // ▼▼▼ 【決定版】この行が index.ts への誤爆を防ぎます ▼▼▼
+      // 1. AppTypeのパス (これを修正することで index.tsへの誤爆を防ぐ)
       "@backend/index": ["../backend/src/app.ts"],
 
-      "@backend/*": ["../backend/src/*"],
-
-      // Honoパス設定
+      // 2. Honoのパスを修正
       "hono": ["./node_modules/hono"],
       "hono/cors": ["./node_modules/hono/dist/cors"],
-      "hono/*": ["./node_modules/hono/dist/*"],
+      "hono/*": ["./node_modules/hono/dist/*"], // これで試します
 
+      "@backend/*": ["../backend/src/*"],
       "*": ["./node_modules/*"]
     }
   },
-  // includeは src/**/* だけでOK
   "include": ["src/**/*"]
 }
