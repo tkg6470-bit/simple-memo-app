@@ -20,6 +20,10 @@
     "types": ["vite/client", "node", "react", "react-dom"],
 
     "paths": {
+      // ▼▼▼ 【復活】この1行が抜けていました！本当にごめんなさい！ ▼▼▼
+      "@backend/index": ["../backend/src/app.ts"],
+
+      // その他のバックエンドファイルへのパス
       "@backend/*": ["../backend/src/*"],
 
       // Honoの設定
@@ -29,8 +33,5 @@
       "*": ["./node_modules/*"]
     }
   },
-
-  // ▼▼▼ 修正箇所: バックエンドの指定を削除しました ▼▼▼
-  // これにより、index.ts などの不要なファイルが無視され、corsエラーが消えます
   "include": ["src/**/*"]
 }
