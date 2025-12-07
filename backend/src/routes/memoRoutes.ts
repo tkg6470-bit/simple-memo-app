@@ -110,6 +110,7 @@ const route = app
 
       return c.json(memo, 201);
     } catch (error) {
+      // 修正: エラー変数をログに出力
       console.error(error);
       return c.json({ error: "Failed to create memo" }, 500);
     }
