@@ -16,27 +16,26 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
 
-    // ▼ 1. React/Vite用の設定 (Reactエラー対策)
-    // 必要な型定義を明示的に読み込みます
-    "types": ["vite/client", "node", "react", "react-dom"],
-
-    // ▼ 2. バックエンドの型チェックを緩める設定
+    // ▼ 1. 型チェックを緩める（ビルド優先）
     "noImplicitAny": false,
+
+    // ▼ 2. 必要な型定義をすべて明記
+    "types": ["vite/client", "node", "react", "react-dom"],
 
     "paths": {
       // バックエンドへのエイリアス
-      "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // ▼ 3. Hono用の個別パス設定 (Honoエラー対策)
-      // これが無いと hono/cors が見つかりません
+      // ▼ 3. Honoのパス解決 (ここを強化しました)
       "hono": ["./node_modules/hono"],
-      "hono/cors": ["./node_modules/hono/dist/cors"],
-      "hono/client": ["./node_modules/hono/dist/client"],
-      "hono/*": ["./node_modules/hono/dist/*"],
-      "@hono/*": ["./node_modules/@hono/*"],
 
-      // ▼ 4. その他のライブラリ用の保険
+      // フォルダ(index.d.ts) と ファイル(.d.ts) の両方を探すように指定
+      "hono/*": [
+        "./node_modules/hono/dist/*",
+        "./node_modules/hono/dist/*.d.ts"
+      ],
+
+      // ▼ 4. その他のライブラリ用のバックアップ
       "*": ["./node_modules/*"]
     }
   },
