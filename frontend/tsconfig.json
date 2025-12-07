@@ -16,26 +16,18 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
 
-    // ▼ 1. 型チェックを緩める（ビルド優先）
     "noImplicitAny": false,
-
-    // ▼ 2. 必要な型定義をすべて明記
     "types": ["vite/client", "node", "react", "react-dom"],
 
     "paths": {
-      // バックエンドへのエイリアス
       "@backend/*": ["../backend/src/*"],
 
-      // ▼ 3. Honoのパス解決 (ここを強化しました)
+      // ▼ Honoのパス設定 (ここを修正)
       "hono": ["./node_modules/hono"],
+      // corsなどはフォルダとして指定するのが正解でした
+      "hono/cors": ["./node_modules/hono/dist/cors"],
+      "hono/*": ["./node_modules/hono/dist/*"],
 
-      // フォルダ(index.d.ts) と ファイル(.d.ts) の両方を探すように指定
-      "hono/*": [
-        "./node_modules/hono/dist/*",
-        "./node_modules/hono/dist/*.d.ts"
-      ],
-
-      // ▼ 4. その他のライブラリ用のバックアップ
       "*": ["./node_modules/*"]
     }
   },

@@ -13,4 +13,6 @@ const app = new Hono()
   .route("/api/test", testRouter);
 
 export default app;
+
+// ▼ これが重要！型をエクスポートする記述
 export type AppType = typeof app;
