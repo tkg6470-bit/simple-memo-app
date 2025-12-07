@@ -15,30 +15,23 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    // 型定義の読み込み（ここは変更なし）
     "types": ["vite/client", "node"],
 
     "baseUrl": ".",
     "paths": {
-      // 1. バックエンドのソースコードへのエイリアス
+      // 1. バックエンドへのエイリアス
       "@backend/index": ["../backend/src/app.ts"],
       "@backend/*": ["../backend/src/*"],
 
-      // 2. Hono関連のパス解決（ここが重要！）
-      // Hono v4 の特殊な構造に合わせて、個別にマップします
+      // 2. Hono用の特別なルート (ここが優先されます)
       "hono": ["./node_modules/hono"],
       "hono/cors": ["./node_modules/hono/dist/cors"],
       "hono/client": ["./node_modules/hono/dist/client"],
       "hono/*": ["./node_modules/hono/dist/*"],
       "@hono/*": ["./node_modules/@hono/*"],
 
-      // 3. その他のバックエンド用ライブラリ
-      "zod": ["./node_modules/zod"],
-      "@prisma/client": ["./node_modules/@prisma/client"],
-      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
-
-      // ⚠️ 注意: "*" (ワイルドカード) は削除しました。
-      // これにより、Reactなどは標準のルールで見つかるようになります。
+      // 3. その他のライブラリ用の一般的なルート (Reactなどはここを通ります)
+      "*": ["./node_modules/*", "./node_modules/@types/*"]
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
