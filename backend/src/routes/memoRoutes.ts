@@ -38,6 +38,8 @@ const route = app
       });
       return c.json(memos, 200);
     } catch (error) {
+      // 修正: エラー変数をログに出力して使用済みにする
+      console.error(error);
       return c.json({ error: "Failed to fetch" }, 500);
     }
   })
@@ -65,28 +67,21 @@ const route = app
         // MinIO (S3) にアップロード
         await uploadImage(key, buffer, mimeType);
 
-        // ▼▼▼ 修正: 画像URLの生成ロジック (より頑丈に修正) ▼▼▼
-
-        // 環境変数を取得（なければ空文字）
+        // 画像URLの生成ロジック
         const rawEndpoint = process.env.AWS_ENDPOINT || "";
         let publicEndpoint = "";
 
-        // "minio" が含まれている、または 環境変数が空なら、強制的に localhost:9000 (ブラウザ用) を使う
         if (rawEndpoint.includes("minio") || !rawEndpoint) {
           publicEndpoint = "http://localhost:9000";
         } else {
-          // 本番環境(Supabaseなど)用の置換処理
           publicEndpoint = rawEndpoint.replace(
             "/storage/v1/s3",
             "/storage/v1/object/public"
           );
         }
 
-        // バケット名も環境変数がなければデフォルト値を使う
         const bucketName = process.env.AWS_BUCKET_NAME || "memo-bucket";
-
         imageUrl = `${publicEndpoint}/${bucketName}/${key}`;
-        // ▲▲▲ 修正ここまで ▲▲▲
       }
 
       const memo = await prisma.memo.create({
@@ -147,6 +142,8 @@ const route = app
         results: safeResults as any[],
       });
     } catch (error) {
+      // 修正: エラー変数をログに出力
+      console.error(error);
       return c.json({ error: "Search failed" }, 500);
     }
   })
@@ -163,6 +160,8 @@ const route = app
       });
       return c.json({ success: true });
     } catch (e) {
+      // 修正: エラー変数をログに出力
+      console.error(e);
       return c.json({ error: "Failed to delete" }, 500);
     }
   })
