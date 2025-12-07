@@ -22,12 +22,15 @@
     "paths": {
       "@backend/*": ["../backend/src/*"],
 
-      // ▼ Honoのパス設定 (ここを修正)
+      // ▼ Honoの設定（ここを強化）
+      // "hono" 本体へのパス
       "hono": ["./node_modules/hono"],
-      // corsなどはフォルダとして指定するのが正解でした
-      "hono/cors": ["./node_modules/hono/dist/cors"],
-      "hono/*": ["./node_modules/hono/dist/*"],
 
+      // "hono/cors" などのサブパスを dist フォルダに向ける
+      // ※ 2行書くことで、フォルダとファイルの両方を探させます
+      "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
+
+      // その他のライブラリ
       "*": ["./node_modules/*"]
     }
   },

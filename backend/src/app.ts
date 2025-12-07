@@ -14,5 +14,7 @@ const app = new Hono()
 
 export default app;
 
-// ▼ これが重要！型をエクスポートする記述
+// ▼▼▼ フロントエンドで型を使うために必須の記述 ▼▼▼
 export type AppType = typeof app;
+
+// Fix: Force update for Render deployment
