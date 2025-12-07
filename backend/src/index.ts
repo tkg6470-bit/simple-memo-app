@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { clerkMiddleware } from "@hono/clerk-auth";
-import routeApp from "./app"; // 👈 作成した app.ts を読み込み
+import routeApp from "./app";
 
 const app = new Hono();
 
@@ -34,15 +34,15 @@ app.use(
 app.use("*", clerkMiddleware());
 
 // --- ルートのマウント ---
-// ここで、先ほど作った routeApp をメインアプリに合体させます
 app.route("/", routeApp);
 
 app.get("/", (c) => c.text("Backend is Running"));
 
-const port = 8080;
+// 【修正箇所】環境変数 PORT を優先し、なければ 3000 (ローカル用) を使う
+const port = Number(process.env.PORT) || 3000;
 console.log(`Server is running on port ${port}`);
 
 serve({
   fetch: app.fetch,
-  port,
+  port, // 修正した port 変数を渡す
 });
