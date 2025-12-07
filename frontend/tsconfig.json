@@ -22,17 +22,15 @@
     "paths": {
       "@backend/*": ["../backend/src/*"],
 
-      // ▼ Honoの設定（ここを強化）
-      // "hono" 本体へのパス
+      // Honoの設定
       "hono": ["./node_modules/hono"],
-
-      // "hono/cors" などのサブパスを dist フォルダに向ける
-      // ※ 2行書くことで、フォルダとファイルの両方を探させます
       "hono/*": ["./node_modules/hono/dist/*", "./node_modules/hono/*"],
 
-      // その他のライブラリ
       "*": ["./node_modules/*"]
     }
   },
-  "include": ["src/**/*", "../backend/src/**/*"]
+
+  // ▼▼▼ 修正箇所: バックエンドの指定を削除しました ▼▼▼
+  // これにより、index.ts などの不要なファイルが無視され、corsエラーが消えます
+  "include": ["src/**/*"]
 }
