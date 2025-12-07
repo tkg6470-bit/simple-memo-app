@@ -13,11 +13,7 @@ services:
     dockerContext: .
     healthCheckPath: /
 
-    # 【修正1】環境変数グループは envVars の外に出しました
-    envVarGroups:
-      - shared-secrets
-
-    # 個別の環境変数はここに書きます
+    # 環境変数
     envVars:
       - key: NODE_ENV
         value: production
@@ -26,13 +22,21 @@ services:
       - key: AWS_ENDPOINT
         value: ""
 
+      # 【重要】機密情報 (DB URLなど) は YAML に書かず
+      # Render ダッシュボードの "Environment Groups" で管理します。
+      # "sync: false" にすることで、YAMLの設定で上書きされるのを防ぎます。
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+
   # ---------------------------------------------------
   # 2. Frontend Service (React + Vite)
   # ---------------------------------------------------
   - type: web
     name: simple-memo-frontend
     env: static
-    # 【修正2】region を削除しました（Static Siteには不要）
+    # region は削除しました (Static Siteには不要)
 
     rootDir: frontend
     buildCommand: npm install && npm run build
@@ -43,6 +47,4 @@ services:
         fromService:
           type: web
           name: simple-memo-backend
-          # 【修正3】property を "url" から "host" に変更しました
-          # 注: これで "https://" なしのドメイン (例: my-app.onrender.com) が入ります
-          property: host
+          property: host # "url" ではなく "host" を使用
