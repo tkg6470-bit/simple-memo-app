@@ -8,9 +8,14 @@ services:
     plan: free
     region: singapore
 
-    rootDir: .
-    dockerfilePath: ./backend/Dockerfile
+    # 【重要修正】ここを変えました
+    # これにより、Renderはこのフォルダに入ってからビルドを開始します
+    rootDir: backend
+
+    # rootDir が backend になったので、パスはシンプルになります
+    dockerfilePath: Dockerfile
     dockerContext: .
+
     healthCheckPath: /
 
     # 環境変数
@@ -22,9 +27,7 @@ services:
       - key: AWS_ENDPOINT
         value: ""
 
-      # 【重要】機密情報 (DB URLなど) は YAML に書かず
-      # Render ダッシュボードの "Environment Groups" で管理します。
-      # "sync: false" にすることで、YAMLの設定で上書きされるのを防ぎます。
+      # 機密情報は Render ダッシュボードで管理 (sync: false)
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
@@ -36,7 +39,7 @@ services:
   - type: web
     name: simple-memo-frontend
     env: static
-    # region は削除しました (Static Siteには不要)
+    # region なし (Static Site仕様)
 
     rootDir: frontend
     buildCommand: npm install && npm run build
@@ -47,4 +50,4 @@ services:
         fromService:
           type: web
           name: simple-memo-backend
-          property: host # "url" ではなく "host" を使用
+          property: host
