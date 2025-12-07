@@ -42,8 +42,6 @@ export const memoApi = {
     // バックエンドのレスポンス形式に合わせて結果を返す
     // もし { results: [...] } 形式なら response.data.results
     // 配列そのものなら response.data
-    // ▼▼▼ 修正: CIエラー回避 (any許可) ▼▼▼
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return response.data.results || (response.data as any);
   },
 

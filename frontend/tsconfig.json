@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ESNext",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -8,13 +8,27 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    
+    // 型定義の追加
+    "types": ["vite/client", "node"],
+
+    // パス解決の設定
+    "baseUrl": ".",
+    "paths": {
+      // ▼▼▼ 修正ポイント ▼▼▼
+      // client.ts で "@backend/index" をインポートしたとき、
+      // 実際にはきれいな型定義を持つ "app.ts" を読みに行くように設定します。
+      "@backend/index": ["../backend/src/app.ts"],
+      
+      // その他のファイル用
+      "@backend/*": ["../backend/src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src/**/*", "../backend/src/**/*"]
 }

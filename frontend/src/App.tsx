@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { memoApi } from "./api/memoApi";
-import { Memo } from "./types/memo";
+import { client } from "./client"; // 👈 Hono RPCクライアントを使う
+import type { Memo } from "./types/memo"; // 型定義はそのまま利用
 import {
   SignedIn,
   SignedOut,
@@ -10,7 +10,7 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 
-// ▼▼▼ 修正: 検索バーコンポーネント (インラインスタイルでサイズ固定) ▼▼▼
+// ▼▼▼ 検索バーコンポーネント (変更なし) ▼▼▼
 const SearchBar = ({
   onSearch,
   isLoading,
@@ -32,7 +32,6 @@ const SearchBar = ({
         alignItems: "center",
       }}
     >
-      {/* アイコン: スタイルで幅・高さを20pxに強制指定 */}
       <div
         style={{
           position: "absolute",
@@ -58,7 +57,6 @@ const SearchBar = ({
         </svg>
       </div>
 
-      {/* 入力欄: 左側にアイコン分の余白(padding-left)を設ける */}
       <input
         type="text"
         placeholder="AI検索: 「旅行の計画」など意味で検索..."
@@ -66,7 +64,7 @@ const SearchBar = ({
         onChange={(e) => setQ(e.target.value)}
         style={{
           width: "100%",
-          padding: "12px 12px 12px 40px", // 左パディングを40pxにしてアイコンと重ならないように
+          padding: "12px 12px 12px 40px",
           borderRadius: "8px",
           border: "1px solid #ccc",
           fontSize: "16px",
@@ -96,7 +94,8 @@ const SearchBar = ({
 };
 
 function App() {
-  const [memos, setMemos] = useState<Memo[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [memos, setMemos] = useState<any[]>([]); // 柔軟性のために一旦any[] (本来はMemo[])
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -113,19 +112,28 @@ function App() {
 
   useEffect(() => {
     if (user) loadMemos();
-    // ▼▼▼ 修正: CI警告回避 (依存配列のチェックを無視) ▼▼▼
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const getTokenStr = async () => {
-    return (await getToken()) || "";
+  // 認証ヘッダーを取得するヘルパー
+  const getHeaders = async () => {
+    const token = await getToken();
+    return {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
   };
 
   const loadMemos = async () => {
     try {
-      const token = await getTokenStr();
-      const data = await memoApi.getAllMemos(token);
-      setMemos(data);
+      const headers = await getHeaders();
+      // 👇 Hono RPC: 全件取得
+      const res = await client.api.memos.$get(undefined, headers);
+      if (res.ok) {
+        const data = await res.json();
+        setMemos(data);
+      }
     } catch (error) {
       console.error("Failed to load memos", error);
     }
@@ -140,9 +148,20 @@ function App() {
 
     setIsSearching(true);
     try {
-      const token = await getTokenStr();
-      const results = await memoApi.searchMemos(token, query);
-      setMemos(results);
+      const headers = await getHeaders();
+      // 👇 Hono RPC: 検索
+      const res = await client.api.memos.search.$get(
+        { query: { q: query } },
+        headers
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        // バックエンドの実装に合わせて results プロパティを取り出す
+        // ※検索APIは { success: true, results: [...] } を返します
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMemos((data as any).results || []);
+      }
     } catch (error) {
       console.error("Search failed", error);
       alert("検索に失敗しました");
@@ -157,25 +176,33 @@ function App() {
       return;
     }
     try {
-      const token = await getTokenStr();
-      const formData = new FormData();
-      formData.append("title", title);
-      formData.append("content", content);
-      if (image) formData.append("image", image);
+      const headers = await getHeaders();
+      
+      // 👇 Hono RPC: 作成
+      // clientは 'form' プロパティにオブジェクトを渡すと自動でFormDataにしてくれます
+      const res = await client.api.memos.$post(
+        {
+          form: {
+            title,
+            content,
+            image: image || "", // ファイルがない場合は空文字などを渡す(サーバー側の実装による)
+          },
+        },
+        headers
+      );
 
-      await memoApi.createMemo(token, formData);
-
-      setTitle("");
-      setContent("");
-      setImage(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-
-      setSearchQuery("");
-      loadMemos();
-      // ▼▼▼ 修正: CIエラー回避 (any許可) ▼▼▼
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      alert("保存に失敗しました");
+      if (res.ok) {
+        setTitle("");
+        setContent("");
+        setImage(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setSearchQuery("");
+        loadMemos();
+      } else {
+        alert("保存に失敗しました");
+      }
+    } catch (error) {
+      alert("エラーが発生しました");
       console.error(error);
     }
   };
@@ -183,9 +210,19 @@ function App() {
   const handleDelete = async (id: number) => {
     if (!confirm("削除しますか？")) return;
     try {
-      const token = await getTokenStr();
-      await memoApi.deleteMemo(token, id);
-      setMemos((prev) => prev.filter((m) => m.id !== id));
+      const headers = await getHeaders();
+      // 👇 Hono RPC: 削除
+      // パスパラメータ :id は param オブジェクトで渡します
+      const res = await client.api.memos[":id"].$delete(
+        {
+          param: { id: id.toString() },
+        },
+        headers
+      );
+
+      if (res.ok) {
+        setMemos((prev) => prev.filter((m) => m.id !== id));
+      }
     } catch (error) {
       alert("削除に失敗しました");
     }
@@ -194,9 +231,19 @@ function App() {
   const handleSummarize = async (id: number) => {
     setLoadingMap((prev) => ({ ...prev, [id]: true }));
     try {
-      const token = await getTokenStr();
-      const res = await memoApi.summarizeMemo(token, id);
-      setSummaries((prev) => ({ ...prev, [id]: res.summary }));
+      const headers = await getHeaders();
+      // 👇 Hono RPC: 要約
+      const res = await client.api.memos[":id"].summarize.$post(
+        {
+          param: { id: id.toString() },
+        },
+        headers
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        setSummaries((prev) => ({ ...prev, [id]: data.summary }));
+      }
     } catch (error) {
       alert("要約に失敗しました");
     } finally {
@@ -367,9 +414,10 @@ function App() {
               )}
             </div>
 
-            {memo.imageUrl && (
+            {/* 検索結果(snake_case)と通常取得(camelCase)の両方に対応 */}
+            {(memo.imageUrl || memo.image_url) && (
               <img
-                src={memo.imageUrl}
+                src={memo.imageUrl || memo.image_url}
                 alt="uploaded"
                 style={{
                   maxWidth: "100%",
@@ -439,3 +487,6 @@ function App() {
 }
 
 export default App;
+
+client.api.test.hello.$get() // 👈 これが補完に出るか？
+client.api.memos.$get()      // 👈 これはエラーのままか？

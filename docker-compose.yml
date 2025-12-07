@@ -32,8 +32,8 @@ services:
     depends_on:
       - db
       - minio
-    # 永遠に実行し続けるコマンドを強制し、コンテナが終了するのを防ぐ
-    command: tail -f /dev/null
+    # ▼▼▼ 修正箇所: サーバーを起動するコマンドに変更 ▼▼▼
+    command: sh -c "npm install && npm run dev"
 
   # 3. フロントエンド (React/Vite)
   frontend:
