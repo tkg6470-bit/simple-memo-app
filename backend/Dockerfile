@@ -4,18 +4,23 @@ FROM node:20-slim
 # 作業ディレクトリ
 WORKDIR /app
 
-# ⚠️ 追加: Prismaに必要なOpenSSLをインストールします
+# Prismaに必要なOpenSSLをインストール
 RUN apt-get update -y && apt-get install -y openssl
 
 COPY package*.json ./ 
 
-RUN npm install --omit=dev
+# 【修正1】 "--omit=dev" を削除
+# ビルドには TypeScript (devDependencies) が必要なため、全てインストールします
+RUN npm install
 
-# ソースコード一式（dist含む）をコピー
+# ソースコード一式をコピー
 COPY . .
 
+# 【修正2】 ビルドコマンドを追加
+# これで最新の src/index.ts から 新しい dist/index.js が生成されます！
+RUN npm run build
+
 # データベース接続ツールの準備
-# (OpenSSLを入れたので、ここで正しいバージョンが自動検知されます)
 RUN npx prisma generate
 
 # アプリケーションの起動
