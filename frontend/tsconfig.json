@@ -14,20 +14,24 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    
+
     // 型定義の追加
     "types": ["vite/client", "node"],
 
     // パス解決の設定
     "baseUrl": ".",
     "paths": {
-      // ▼▼▼ 修正ポイント ▼▼▼
-      // client.ts で "@backend/index" をインポートしたとき、
-      // 実際にはきれいな型定義を持つ "app.ts" を読みに行くように設定します。
+      // ▼ 既存の設定
       "@backend/index": ["../backend/src/app.ts"],
-      
-      // その他のファイル用
-      "@backend/*": ["../backend/src/*"]
+      "@backend/*": ["../backend/src/*"],
+
+      // ▼▼▼ 【追加】迷子のライブラリを frontend/node_modules に誘導する設定 ▼▼▼
+      "hono": ["./node_modules/hono"],
+      "hono/*": ["./node_modules/hono/*"],
+      "@hono/*": ["./node_modules/@hono/*"],
+      "zod": ["./node_modules/zod"],
+      "@prisma/client": ["./node_modules/@prisma/client"],
+      "@aws-sdk/*": ["./node_modules/@aws-sdk/*"]
     }
   },
   "include": ["src/**/*", "../backend/src/**/*"]
