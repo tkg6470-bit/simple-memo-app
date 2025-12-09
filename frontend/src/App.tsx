@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { client } from "./client"; // 👈 Hono RPCクライアントを使う
-import type { Memo } from "./types/memo"; // 型定義はそのまま利用
+import { client } from "./client";
+import type { Memo } from "./types/memo";
 import {
   SignedIn,
   SignedOut,
@@ -10,7 +10,6 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 
-// ▼▼▼ 検索バーコンポーネント (変更なし) ▼▼▼
 const SearchBar = ({
   onSearch,
   isLoading,
@@ -94,8 +93,8 @@ const SearchBar = ({
 };
 
 function App() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [memos, setMemos] = useState<any[]>([]); // 柔軟性のために一旦any[] (本来はMemo[])
+  // 👇 修正: any[] を Memo[] に変更しました
+  const [memos, setMemos] = useState<Memo[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [image, setImage] = useState<File | null>(null);
@@ -115,7 +114,6 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // 認証ヘッダーを取得するヘルパー
   const getHeaders = async () => {
     const token = await getToken();
     return {
@@ -128,11 +126,12 @@ function App() {
   const loadMemos = async () => {
     try {
       const headers = await getHeaders();
-      // 👇 Hono RPC: 全件取得
       const res = await client.api.memos.$get(undefined, headers);
       if (res.ok) {
         const data = await res.json();
-        setMemos(data);
+        // Hono RPCの型推論が効いていれば、dataはMemo[]として扱えるはずですが
+        // 型定義の厳密度によってはアサーションが必要な場合があります
+        setMemos(data as unknown as Memo[]);
       }
     } catch (error) {
       console.error("Failed to load memos", error);
@@ -149,7 +148,6 @@ function App() {
     setIsSearching(true);
     try {
       const headers = await getHeaders();
-      // 👇 Hono RPC: 検索
       const res = await client.api.memos.search.$get(
         { query: { q: query } },
         headers
@@ -157,10 +155,9 @@ function App() {
 
       if (res.ok) {
         const data = await res.json();
-        // バックエンドの実装に合わせて results プロパティを取り出す
-        // ※検索APIは { success: true, results: [...] } を返します
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setMemos((data as any).results || []);
+        const results = (data as any).results || [];
+        setMemos(results);
       }
     } catch (error) {
       console.error("Search failed", error);
@@ -177,15 +174,13 @@ function App() {
     }
     try {
       const headers = await getHeaders();
-      
-      // 👇 Hono RPC: 作成
-      // clientは 'form' プロパティにオブジェクトを渡すと自動でFormDataにしてくれます
+
       const res = await client.api.memos.$post(
         {
           form: {
             title,
             content,
-            image: image || "", // ファイルがない場合は空文字などを渡す(サーバー側の実装による)
+            image: image || "",
           },
         },
         headers
@@ -211,8 +206,6 @@ function App() {
     if (!confirm("削除しますか？")) return;
     try {
       const headers = await getHeaders();
-      // 👇 Hono RPC: 削除
-      // パスパラメータ :id は param オブジェクトで渡します
       const res = await client.api.memos[":id"].$delete(
         {
           param: { id: id.toString() },
@@ -232,7 +225,6 @@ function App() {
     setLoadingMap((prev) => ({ ...prev, [id]: true }));
     try {
       const headers = await getHeaders();
-      // 👇 Hono RPC: 要約
       const res = await client.api.memos[":id"].summarize.$post(
         {
           param: { id: id.toString() },
@@ -414,7 +406,6 @@ function App() {
               )}
             </div>
 
-            {/* 検索結果(snake_case)と通常取得(camelCase)の両方に対応 */}
             {(memo.imageUrl || memo.image_url) && (
               <img
                 src={memo.imageUrl || memo.image_url}
@@ -487,6 +478,3 @@ function App() {
 }
 
 export default App;
-
-client.api.test.hello.$get() // 👈 これが補完に出るか？
-client.api.memos.$get()      // 👈 これはエラーのままか？

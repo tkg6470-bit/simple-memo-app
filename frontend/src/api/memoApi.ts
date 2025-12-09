@@ -39,10 +39,8 @@ export const memoApi = {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    // バックエンドのレスポンス形式に合わせて結果を返す
-    // もし { results: [...] } 形式なら response.data.results
-    // 配列そのものなら response.data
-    return response.data.results || (response.data as any);
+    // 👇 修正: 'as any' を 'as unknown as Memo[]' に変更して安全に型付け
+    return response.data.results || (response.data as unknown as Memo[]);
   },
 
   // 削除
