@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { getAuth } from "@hono/clerk-auth";
 import { PrismaClient } from "@prisma/client";
-import { z } from "zod"; // 追加: zodのインポート
+import { z } from "zod";
 import { aiService } from "../services/aiService";
 import { uploadImage } from "../services/storageService";
 import { createMemoSchema, searchMemoSchema } from "../schemas/memoParams";
@@ -27,11 +27,11 @@ const getAuthUser = (c: any) => {
 
 // --- スキーマ定義 ---
 
-// 更新用スキーマ (画像は任意)
+// ▼▼▼ 修正点1: 画像のチェックを緩める (z.any()) ▼▼▼
 const updateMemoSchema = z.object({
   title: z.string().min(1, "タイトルは必須です"),
   content: z.string().min(1, "本文は必須です"),
-  image: z.instanceof(File).optional(),
+  image: z.any().optional(),
 });
 
 // --- ルート定義 (RPC Chain) ---
@@ -73,10 +73,8 @@ const route = app
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // MinIO (S3) にアップロード
         await uploadImage(key, buffer, mimeType);
 
-        // 画像URLの生成ロジック
         const rawEndpoint = process.env.AWS_ENDPOINT || "";
         let publicEndpoint = "";
 
@@ -156,32 +154,40 @@ const route = app
       return c.json({ error: "Search failed" }, 500);
     }
   })
-  // ▼▼▼ メモ編集 (PUT) の実装 ▼▼▼
+  // ▼▼▼ 修正点2: PUTルート (デバッグログ追加 & 画像判定変更) ▼▼▼
   .put("/:id", zValidator("form", updateMemoSchema), async (c) => {
+    console.log("--> PUT Request Received"); // ログ
+
     const auth = getAuthUser(c);
     if (!auth) return c.json({ error: "Unauthorized" }, 401);
 
-    const id = Number(c.req.param("id")); // IDを数値に変換
+    const id = Number(c.req.param("id"));
     const { title, content, image } = c.req.valid("form");
 
     try {
-      // 1. 存在確認と権限チェック
+      // 1. 存在確認
       const currentMemo = await prisma.memo.findUnique({
         where: { id },
       });
 
       if (!currentMemo) {
+        console.log("Memo not found");
         return c.json({ error: "Memo not found" }, 404);
       }
       if (currentMemo.userId !== auth.userId) {
+        console.log("Unauthorized user");
         return c.json({ error: "Unauthorized update" }, 403);
       }
 
       let imageUrl = currentMemo.imageUrl;
 
-      // 2. 画像がアップロードされた場合のみ更新処理 (POSTと同様のロジック)
-      if (image && image instanceof File) {
-        const file = image;
+      // 2. 画像更新ロジック
+      // 型チェックを緩め、「オブジェクトで名前(name)があるもの」ならFileとみなす
+      if (image && typeof image === "object" && "name" in image) {
+        console.log("Image detected, uploading...");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const file = image as any; // 強制キャスト
+
         const ext = file.name ? file.name.split(".").pop() : "png";
         const safeFileName = `${Date.now()}_${Math.random()
           .toString(36)
@@ -208,6 +214,7 @@ const route = app
 
         const bucketName = process.env.AWS_BUCKET_NAME || "memo-bucket";
         imageUrl = `${publicEndpoint}/${bucketName}/${key}`;
+        console.log("Uploaded URL:", imageUrl);
       }
 
       // 3. データベース更新
@@ -220,7 +227,7 @@ const route = app
         },
       });
 
-      // 4. ベクトル再生成 (内容が変わったため)
+      // 4. ベクトル再生成 (失敗しても続行)
       (async () => {
         try {
           const embedding = await aiService.generateEmbedding(
@@ -238,7 +245,7 @@ const route = app
 
       return c.json(updatedMemo, 200);
     } catch (error) {
-      console.error(error);
+      console.error("PUT Error:", error);
       return c.json({ error: "Failed to update memo" }, 500);
     }
   })
