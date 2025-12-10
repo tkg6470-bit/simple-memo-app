@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { client } from "./client";
 import type { Memo } from "./types/memo";
+import EditMemoModal from "./components/EditMemoModal"; // 👈 追加
 import {
   SignedIn,
   SignedOut,
@@ -93,7 +94,6 @@ const SearchBar = ({
 };
 
 function App() {
-  // 👇 修正: any[] を Memo[] に変更しました
   const [memos, setMemos] = useState<Memo[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -105,6 +105,10 @@ function App() {
 
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 👇 追加: 編集用のState
+  const [editingMemo, setEditingMemo] = useState<Memo | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { user } = useUser();
   const { getToken } = useAuth();
@@ -129,8 +133,6 @@ function App() {
       const res = await client.api.memos.$get(undefined, headers);
       if (res.ok) {
         const data = await res.json();
-        // Hono RPCの型推論が効いていれば、dataはMemo[]として扱えるはずですが
-        // 型定義の厳密度によってはアサーションが必要な場合があります
         setMemos(data as unknown as Memo[]);
       }
     } catch (error) {
@@ -218,6 +220,40 @@ function App() {
       }
     } catch (error) {
       alert("削除に失敗しました");
+    }
+  };
+
+  // 👇 追加: 編集ボタンクリック時の処理
+  const handleEditClick = (memo: Memo) => {
+    setEditingMemo(memo);
+    setIsEditModalOpen(true);
+  };
+
+  // 👇 追加: メモ更新処理 (Hono RPC)
+  const handleUpdateMemo = async (id: string, formData: FormData) => {
+    try {
+      const headers = await getHeaders();
+      const res = await client.api.memos[":id"].$put(
+        {
+          param: { id },
+          form: {
+            title: formData.get("title") as string,
+            content: formData.get("content") as string,
+            image: (formData.get("image") as File) || undefined,
+          },
+        },
+        headers
+      );
+
+      if (!res.ok) {
+        throw new Error("Update failed");
+      }
+
+      // 更新後にリストを再取得
+      loadMemos();
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
   };
 
@@ -442,6 +478,21 @@ function App() {
                 gap: "10px",
               }}
             >
+              {/* 👇 追加: 編集ボタン */}
+              <button
+                onClick={() => handleEditClick(memo)}
+                style={{
+                  padding: "5px 10px",
+                  background: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                編集
+              </button>
+
               <button
                 onClick={() => handleSummarize(memo.id)}
                 disabled={loadingMap[memo.id]}
@@ -473,6 +524,16 @@ function App() {
           </div>
         ))}
       </SignedIn>
+
+      {/* 👇 追加: 編集モーダル */}
+      {editingMemo && (
+        <EditMemoModal
+          memo={editingMemo}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onUpdate={handleUpdateMemo}
+        />
+      )}
     </div>
   );
 }
