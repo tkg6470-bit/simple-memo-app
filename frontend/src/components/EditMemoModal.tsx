@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 
-// ※ 型定義はプロジェクトの実態に合わせて調整してください
+// ※ App.tsx と型を合わせるための定義
 interface Memo {
-  id: string;
+  id: string | number; // IDが数値か文字列か両方対応できるように
   title: string;
   content: string;
-  imageUrl: string | null;
-  createdAt: string;
+  imageUrl?: string | null;
+  createdAt?: string;
 }
 
 interface EditMemoModalProps {
@@ -27,7 +27,6 @@ export default function EditMemoModal({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // モーダルが開くたびに初期値をセット
   useEffect(() => {
     if (isOpen) {
       setTitle(memo.title);
@@ -50,8 +49,8 @@ export default function EditMemoModal({
     }
 
     try {
-      await onUpdate(memo.id, formData);
-      onClose(); // 成功したら閉じる
+      await onUpdate(String(memo.id), formData);
+      onClose();
     } catch (error) {
       console.error("Failed to update memo:", error);
       alert("更新に失敗しました。");
@@ -61,39 +60,114 @@ export default function EditMemoModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-6">
-        <h2 className="text-xl font-bold mb-4">メモを編集</h2>
+    // オーバーレイ (背景の黒い部分)
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000, // 最前面に表示
+      }}
+      onClick={onClose} // 背景クリックで閉じる
+    >
+      {/* モーダル本体 */}
+      <div
+        style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          padding: "24px",
+          width: "90%",
+          maxWidth: "500px",
+          boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+        }}
+        onClick={(e) => e.stopPropagation()} // 中身クリックでは閉じないように
+      >
+        <h2
+          style={{
+            fontSize: "1.25rem",
+            fontWeight: "bold",
+            marginBottom: "16px",
+            margin: 0,
+          }}
+        >
+          メモを編集
+        </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#374151",
+                marginBottom: "4px",
+              }}
+            >
               タイトル
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #d1d5db",
+                boxSizing: "border-box", // 枠からはみ出ないように
+              }}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#374151",
+                marginBottom: "4px",
+              }}
+            >
               本文
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
-              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #d1d5db",
+                boxSizing: "border-box",
+              }}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#374151",
+                marginBottom: "4px",
+              }}
+            >
               画像 (変更する場合のみ)
             </label>
             <input
@@ -104,23 +178,49 @@ export default function EditMemoModal({
                   setImageFile(e.target.files[0]);
                 }
               }}
-              className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              style={{ fontSize: "0.875rem", color: "#6b7280" }}
             />
           </div>
 
-          <div className="flex justify-end space-x-2 pt-2">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "8px",
+              paddingTop: "8px",
+            }}
+          >
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               disabled={isLoading}
+              style={{
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "#374151",
+                backgroundColor: "#f3f4f6",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+              }}
             >
               キャンセル
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
               disabled={isLoading}
+              style={{
+                padding: "8px 16px",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                color: "white",
+                backgroundColor: "#2563eb", // 青色
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                opacity: isLoading ? 0.7 : 1,
+              }}
             >
               {isLoading ? "保存中..." : "保存する"}
             </button>
