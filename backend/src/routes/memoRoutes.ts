@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { getAuth } from "@hono/clerk-auth";
 import { PrismaClient } from "@prisma/client";
+import { z } from "zod"; // 追加: zodのインポート
 import { aiService } from "../services/aiService";
 import { uploadImage } from "../services/storageService";
 import { createMemoSchema, searchMemoSchema } from "../schemas/memoParams";
@@ -24,6 +25,15 @@ const getAuthUser = (c: any) => {
   return { userId: auth.userId };
 };
 
+// --- スキーマ定義 ---
+
+// 更新用スキーマ (画像は任意)
+const updateMemoSchema = z.object({
+  title: z.string().min(1, "タイトルは必須です"),
+  content: z.string().min(1, "本文は必須です"),
+  image: z.instanceof(File).optional(),
+});
+
 // --- ルート定義 (RPC Chain) ---
 
 const route = app
@@ -38,7 +48,6 @@ const route = app
       });
       return c.json(memos, 200);
     } catch (error) {
-      // 修正: エラー変数をログに出力して使用済みにする
       console.error(error);
       return c.json({ error: "Failed to fetch" }, 500);
     }
@@ -93,6 +102,7 @@ const route = app
         },
       });
 
+      // ベクトル生成 (バックグラウンド)
       (async () => {
         try {
           const embedding = await aiService.generateEmbedding(
@@ -110,7 +120,6 @@ const route = app
 
       return c.json(memo, 201);
     } catch (error) {
-      // 修正: エラー変数をログに出力
       console.error(error);
       return c.json({ error: "Failed to create memo" }, 500);
     }
@@ -143,13 +152,95 @@ const route = app
         results: safeResults as any[],
       });
     } catch (error) {
-      // 修正: エラー変数をログに出力
       console.error(error);
       return c.json({ error: "Search failed" }, 500);
     }
   })
-  .put("/:id", async (c) => {
-    return c.json({ success: true });
+  // ▼▼▼ メモ編集 (PUT) の実装 ▼▼▼
+  .put("/:id", zValidator("form", updateMemoSchema), async (c) => {
+    const auth = getAuthUser(c);
+    if (!auth) return c.json({ error: "Unauthorized" }, 401);
+
+    const id = Number(c.req.param("id")); // IDを数値に変換
+    const { title, content, image } = c.req.valid("form");
+
+    try {
+      // 1. 存在確認と権限チェック
+      const currentMemo = await prisma.memo.findUnique({
+        where: { id },
+      });
+
+      if (!currentMemo) {
+        return c.json({ error: "Memo not found" }, 404);
+      }
+      if (currentMemo.userId !== auth.userId) {
+        return c.json({ error: "Unauthorized update" }, 403);
+      }
+
+      let imageUrl = currentMemo.imageUrl;
+
+      // 2. 画像がアップロードされた場合のみ更新処理 (POSTと同様のロジック)
+      if (image && image instanceof File) {
+        const file = image;
+        const ext = file.name ? file.name.split(".").pop() : "png";
+        const safeFileName = `${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(7)}.${ext}`;
+        const key = `${auth.userId}/${safeFileName}`;
+        const mimeType = file.type || "application/octet-stream";
+
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        await uploadImage(key, buffer, mimeType);
+
+        const rawEndpoint = process.env.AWS_ENDPOINT || "";
+        let publicEndpoint = "";
+
+        if (rawEndpoint.includes("minio") || !rawEndpoint) {
+          publicEndpoint = "http://localhost:9000";
+        } else {
+          publicEndpoint = rawEndpoint.replace(
+            "/storage/v1/s3",
+            "/storage/v1/object/public"
+          );
+        }
+
+        const bucketName = process.env.AWS_BUCKET_NAME || "memo-bucket";
+        imageUrl = `${publicEndpoint}/${bucketName}/${key}`;
+      }
+
+      // 3. データベース更新
+      const updatedMemo = await prisma.memo.update({
+        where: { id },
+        data: {
+          title,
+          content,
+          imageUrl,
+        },
+      });
+
+      // 4. ベクトル再生成 (内容が変わったため)
+      (async () => {
+        try {
+          const embedding = await aiService.generateEmbedding(
+            `${title}\n${content}`
+          );
+          await prisma.$executeRaw`
+            UPDATE "memos" SET "embedding" = ${JSON.stringify(
+              embedding
+            )}::vector WHERE "id" = ${id}
+          `;
+        } catch (e) {
+          console.error("Vector update failed:", e);
+        }
+      })();
+
+      return c.json(updatedMemo, 200);
+    } catch (error) {
+      console.error(error);
+      return c.json({ error: "Failed to update memo" }, 500);
+    }
   })
   .delete("/:id", async (c) => {
     const auth = getAuthUser(c);
@@ -161,7 +252,6 @@ const route = app
       });
       return c.json({ success: true });
     } catch (e) {
-      // 修正: エラー変数をログに出力
       console.error(e);
       return c.json({ error: "Failed to delete" }, 500);
     }
