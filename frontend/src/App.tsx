@@ -319,7 +319,6 @@ function App() {
           </SignInButton>
         </SignedOut>
       </header>
-
       <SignedIn>
         <SearchBar onSearch={handleSearch} isLoading={isSearching} />
 
@@ -524,7 +523,6 @@ function App() {
           </div>
         ))}
       </SignedIn>
-
       {/* 👇 追加: 編集モーダル */}
       {editingMemo && (
         <EditMemoModal
